@@ -34,4 +34,13 @@ interface WorkItemRepositoryInterface
      * generation (e.g. 1 -> "W0001"). Must be called inside a DB transaction.
      */
     public function nextWorkNumber(): int;
+
+    /**
+     * Status-bucketed counts (+ overdue) for the given actor's scope — the
+     * same role/department scoping paginate() applies, never all-departments
+     * data leaking into an admin's or employee's dashboard.
+     *
+     * @return array{total: int, open: int, in_progress: int, pending: int, closed: int, overdue: int}
+     */
+    public function countsByStatus(User $actor): array;
 }

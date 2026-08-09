@@ -19,6 +19,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/work-items', [WorkItemController::class, 'index']);
     Route::post('/work-items', [WorkItemController::class, 'store']);
+    Route::get('/work-items/stats', [WorkItemController::class, 'stats']);
     Route::get('/work-items/{workItem}', [WorkItemController::class, 'show']);
     Route::patch('/work-items/{workItem}', [WorkItemController::class, 'update']);
     Route::patch('/work-items/{workItem}/status', [WorkItemController::class, 'updateStatus']);

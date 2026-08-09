@@ -31,6 +31,17 @@ class WorkItemController extends Controller
         return WorkItemResource::collection($items)->response();
     }
 
+    /**
+     * Dashboard stat cards — counts scoped exactly like index(), so an admin
+     * only ever sees their department's numbers and an employee only their own.
+     */
+    public function stats(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', WorkItem::class);
+
+        return response()->json(['data' => $this->workItems->stats($request->user())]);
+    }
+
     public function store(StoreWorkItemRequest $request): JsonResponse
     {
         $this->authorize('create', WorkItem::class);

@@ -61,6 +61,32 @@ class EloquentWorkItemRepository implements WorkItemRepositoryInterface
         });
     }
 
+    public function countsByStatus(User $actor): array
+    {
+        $base = WorkItem::query()->where('status', '!=', WorkItemStatus::Deleted->value);
+        $this->scopeToActor($base, $actor);
+
+        $byStatus = (clone $base)
+            ->selectRaw('status, count(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        $overdue = (clone $base)
+            ->where('status', '!=', WorkItemStatus::Closed->value)
+            ->whereNotNull('sla_due_at')
+            ->where('sla_due_at', '<', now())
+            ->count();
+
+        return [
+            'total' => (int) $byStatus->sum(),
+            'open' => (int) ($byStatus[WorkItemStatus::Open->value] ?? 0),
+            'in_progress' => (int) ($byStatus[WorkItemStatus::InProgress->value] ?? 0),
+            'pending' => (int) ($byStatus[WorkItemStatus::Pending->value] ?? 0),
+            'closed' => (int) ($byStatus[WorkItemStatus::Closed->value] ?? 0),
+            'overdue' => $overdue,
+        ];
+    }
+
     private function scopeToActor(Builder $query, User $actor): void
     {
         if ($actor->hasRole(Role::SuperAdmin->value)) {

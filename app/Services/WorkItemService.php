@@ -35,6 +35,14 @@ class WorkItemService
     }
 
     /**
+     * @return array{total: int, open: int, in_progress: int, pending: int, closed: int, overdue: int}
+     */
+    public function stats(User $actor): array
+    {
+        return $this->items->countsByStatus($actor);
+    }
+
+    /**
      * @param  array<string, mixed>  $attributes
      */
     public function create(array $attributes, User $actor): WorkItem
