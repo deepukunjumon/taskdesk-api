@@ -7,7 +7,23 @@ use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\SlaSettingController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WorkItemController;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/health', function () {
+    try {
+        DB::connection()->getPdo();
+        $database = 'ok';
+    } catch (\Throwable $e) {
+        $database = 'unreachable';
+    }
+
+    return response()->json([
+        'status' => $database === 'ok' ? 'ok' : 'degraded',
+        'database' => $database,
+        'timestamp' => now()->toIso8601String(),
+    ], $database === 'ok' ? 200 : 503);
+});
 
 Route::post('/login', [AuthController::class, 'login']);
 
