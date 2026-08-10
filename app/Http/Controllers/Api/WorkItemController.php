@@ -10,6 +10,7 @@ use App\Http\Requests\WorkItem\StoreWorkItemRequest;
 use App\Http\Requests\WorkItem\UpdateWorkItemRequest;
 use App\Http\Requests\WorkItem\UpdateWorkItemStatusRequest;
 use App\Http\Resources\WorkItemResource;
+use App\Models\User;
 use App\Models\WorkItem;
 use App\Services\WorkItemService;
 use Illuminate\Http\JsonResponse;
@@ -32,8 +33,8 @@ class WorkItemController extends Controller
     }
 
     /**
-     * Dashboard stat cards — counts scoped exactly like index(), so an admin
-     * only ever sees their department's numbers and an employee only their own.
+     * Dashboard stat cards — counts scoped exactly like index(), so a plain
+     * user only ever sees their own numbers while admin/superadmin see all.
      */
     public function stats(Request $request): JsonResponse
     {
@@ -44,7 +45,8 @@ class WorkItemController extends Controller
 
     public function store(StoreWorkItemRequest $request): JsonResponse
     {
-        $this->authorize('create', WorkItem::class);
+        $target = User::findOrFail($request->validated('assigned_to_id'));
+        $this->authorize('create', [WorkItem::class, $target]);
 
         $item = $this->workItems->create($request->validated(), $request->user());
 
@@ -93,7 +95,8 @@ class WorkItemController extends Controller
 
     public function reassign(ReassignWorkItemRequest $request, WorkItem $workItem): JsonResponse
     {
-        $this->authorize('reassign', $workItem);
+        $newAssignee = User::findOrFail($request->validated('assigned_to_id'));
+        $this->authorize('reassign', [$workItem, $newAssignee]);
 
         $updated = $this->workItems->reassign(
             $workItem,

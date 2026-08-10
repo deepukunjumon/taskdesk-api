@@ -52,7 +52,7 @@ class WorkItemResource extends JsonResource
             'permissions' => $user ? [
                 'can_update' => $policy->update($user, $this->resource),
                 'can_update_status' => $policy->updateStatus($user, $this->resource),
-                'can_reassign' => $policy->reassign($user, $this->resource),
+                'can_reassign' => $policy->canReassign($user, $this->resource),
                 'can_delete' => $policy->delete($user, $this->resource),
             ] : null,
             'editable_fields' => $user ? $policy->editableFields($user, $this->resource) : [],

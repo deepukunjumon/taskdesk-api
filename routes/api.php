@@ -32,6 +32,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
 
     Route::get('/users', [UserController::class, 'index']);
+    Route::get('/users/me/assignable', [UserController::class, 'assignable']);
+    Route::patch('/users/{user}/manager', [UserController::class, 'updateManager']);
 
     Route::get('/work-items', [WorkItemController::class, 'index']);
     Route::post('/work-items', [WorkItemController::class, 'store']);

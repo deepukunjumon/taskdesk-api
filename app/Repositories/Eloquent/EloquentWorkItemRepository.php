@@ -89,13 +89,7 @@ class EloquentWorkItemRepository implements WorkItemRepositoryInterface
 
     private function scopeToActor(Builder $query, User $actor): void
     {
-        if ($actor->hasRole(Role::SuperAdmin->value)) {
-            return;
-        }
-
-        if ($actor->hasRole(Role::Admin->value)) {
-            $query->where('department_id', $actor->department_id);
-
+        if ($actor->hasRole([Role::SuperAdmin->value, Role::Admin->value])) {
             return;
         }
 

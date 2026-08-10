@@ -6,16 +6,22 @@ use App\Enums\Role;
 use App\Enums\WorkItemStatus;
 use App\Models\User;
 use App\Models\WorkItem;
+use App\Services\HierarchyService;
+use App\Services\TaskAssignmentAuthorizer;
 
 /**
  * Item-level authorization only. List-level scoping lives in
  * EloquentWorkItemRepository::paginate() — these two are the only places
- * department/role scoping logic is allowed to live.
+ * role scoping logic is allowed to live.
  *
  * editableFields() is the single source of truth for which fields a user may
  * change via the general update endpoint — UpdateWorkItemRequest filters its
  * validation rules against it, and WorkItemResource exposes the same list to
  * the frontend, so no field-access rule is ever duplicated.
+ *
+ * Assignment (create/reassign) authorization is never decided here directly —
+ * it always delegates to TaskAssignmentAuthorizer, the single source of truth
+ * for "can actor A assign a task to user B".
  */
 class WorkItemPolicy
 {
@@ -38,7 +44,12 @@ class WorkItemPolicy
     /**
      * @var list<string>
      */
-    private const EMPLOYEE_EDIT_FIELDS = ['resolution', 'remarks'];
+    private const USER_EDIT_FIELDS = ['resolution', 'remarks'];
+
+    public function __construct(
+        private readonly TaskAssignmentAuthorizer $assignmentAuthorizer,
+        private readonly HierarchyService $hierarchy,
+    ) {}
 
     public function viewAny(User $user): bool
     {
@@ -50,9 +61,9 @@ class WorkItemPolicy
         return $this->isInScope($user, $item);
     }
 
-    public function create(User $user): bool
+    public function create(User $user, User $target): bool
     {
-        return $user->hasRole([Role::SuperAdmin->value, Role::Admin->value]);
+        return $this->assignmentAuthorizer->canAssign($user, $target);
     }
 
     public function update(User $user, WorkItem $item): bool
@@ -65,14 +76,32 @@ class WorkItemPolicy
         return $this->isEditable($item) && $this->isInScope($user, $item);
     }
 
-    public function reassign(User $user, WorkItem $item): bool
+    public function reassign(User $user, WorkItem $item, User $newAssignee): bool
     {
-        return $this->isEditable($item) && $this->canManage($user, $item);
+        return $this->isEditable($item) && $this->assignmentAuthorizer->canAssign($user, $newAssignee);
+    }
+
+    /**
+     * Generic "could this user reassign this item to *someone*" check, used
+     * only to decide whether the frontend shows a Reassign control at all —
+     * the actual gate for a specific target is reassign() above.
+     */
+    public function canReassign(User $user, WorkItem $item): bool
+    {
+        if (! $this->isEditable($item)) {
+            return false;
+        }
+
+        if ($this->canManage($user)) {
+            return true;
+        }
+
+        return $this->hierarchy->getDescendants($user)->isNotEmpty();
     }
 
     public function delete(User $user, WorkItem $item): bool
     {
-        return $this->isDeletable($item) && $this->canManage($user, $item);
+        return $this->isDeletable($item) && $this->canManage($user);
     }
 
     /**
@@ -80,15 +109,15 @@ class WorkItemPolicy
      */
     public function editableFields(User $user, WorkItem $item): array
     {
-        if (! $this->update($user, $item)) {
+        if (! $this->isEditable($item) || ! $this->isInScope($user, $item)) {
             return [];
         }
 
-        if ($user->hasRole(Role::Employee->value)) {
-            return self::EMPLOYEE_EDIT_FIELDS;
+        if ($this->canManage($user)) {
+            return self::FULL_EDIT_FIELDS;
         }
 
-        return self::FULL_EDIT_FIELDS;
+        return self::USER_EDIT_FIELDS;
     }
 
     private function isEditable(WorkItem $item): bool
@@ -101,28 +130,16 @@ class WorkItemPolicy
         return ($item->status !== WorkItemStatus::Deleted && $item->status !== WorkItemStatus::Closed);
     }
 
-    /** Superadmin or an admin within the item's own department — never an employee. */
-    private function canManage(User $user, WorkItem $item): bool
+    /** Global — superadmin or admin, never department-conditional. */
+    private function canManage(User $user): bool
     {
-        if ($user->hasRole(Role::SuperAdmin->value)) {
-            return true;
-        }
-
-        if ($user->hasRole(Role::Admin->value)) {
-            return $item->department_id === $user->department_id;
-        }
-
-        return false;
+        return $user->hasRole([Role::SuperAdmin->value, Role::Admin->value]);
     }
 
     private function isInScope(User $user, WorkItem $item): bool
     {
-        if ($user->hasRole(Role::SuperAdmin->value)) {
+        if ($this->canManage($user)) {
             return true;
-        }
-
-        if ($user->hasRole(Role::Admin->value)) {
-            return $item->department_id === $user->department_id;
         }
 
         return $item->assigned_to_id === $user->id;

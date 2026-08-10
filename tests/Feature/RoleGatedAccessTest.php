@@ -17,9 +17,9 @@ it('allows a superadmin to access the role-gated users endpoint', function () {
     $response->assertOk();
 });
 
-it('denies an employee access to the role-gated users endpoint with a 403', function () {
+it('denies a plain user access to the role-gated users endpoint with a 403', function () {
     $user = User::factory()->create();
-    $user->assignRole(Role::Employee->value);
+    $user->assignRole(Role::User->value);
 
     $response = $this->actingAs($user)->getJson('/api/users');
 

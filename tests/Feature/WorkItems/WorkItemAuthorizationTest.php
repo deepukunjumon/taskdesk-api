@@ -10,12 +10,12 @@ beforeEach(function () {
     $this->seed(RoleSeeder::class);
 });
 
-it("prevents an employee from viewing another employee's work item", function () {
+it("prevents a user from viewing another user's work item", function () {
     $department = Department::factory()->create();
     $owner = User::factory()->create(['department_id' => $department->id]);
-    $owner->assignRole(Role::Employee->value);
+    $owner->assignRole(Role::User->value);
     $other = User::factory()->create(['department_id' => $department->id]);
-    $other->assignRole(Role::Employee->value);
+    $other->assignRole(Role::User->value);
 
     $item = WorkItem::factory()->create([
         'department_id' => $department->id,
@@ -26,12 +26,12 @@ it("prevents an employee from viewing another employee's work item", function ()
     $this->actingAs($other)->getJson("/api/work-items/{$item->id}")->assertStatus(403);
 });
 
-it("prevents an employee from updating another employee's work item", function () {
+it("prevents a user from updating another user's work item", function () {
     $department = Department::factory()->create();
     $owner = User::factory()->create(['department_id' => $department->id]);
-    $owner->assignRole(Role::Employee->value);
+    $owner->assignRole(Role::User->value);
     $other = User::factory()->create(['department_id' => $department->id]);
-    $other->assignRole(Role::Employee->value);
+    $other->assignRole(Role::User->value);
 
     $item = WorkItem::factory()->create([
         'department_id' => $department->id,
@@ -46,79 +46,82 @@ it("prevents an employee from updating another employee's work item", function (
     $response->assertStatus(403);
 });
 
-it('prevents an employee from reassigning a work item', function () {
+it('prevents an unrelated user from reassigning a work item', function () {
     $department = Department::factory()->create();
-    $employee = User::factory()->create(['department_id' => $department->id]);
-    $employee->assignRole(Role::Employee->value);
+    $user = User::factory()->create(['department_id' => $department->id]);
+    $user->assignRole(Role::User->value);
     $colleague = User::factory()->create(['department_id' => $department->id]);
+    $colleague->assignRole(Role::User->value);
 
     $item = WorkItem::factory()->create([
         'department_id' => $department->id,
-        'created_by_id' => $employee->id,
-        'assigned_to_id' => $employee->id,
+        'created_by_id' => $user->id,
+        'assigned_to_id' => $user->id,
     ]);
 
-    $response = $this->actingAs($employee)->patchJson("/api/work-items/{$item->id}/reassign", [
+    $response = $this->actingAs($user)->patchJson("/api/work-items/{$item->id}/reassign", [
         'assigned_to_id' => $colleague->id,
     ]);
 
     $response->assertStatus(403);
 });
 
-it("prevents an admin from viewing another department's work item", function () {
+it('allows an admin to view a work item in any department', function () {
     $deptA = Department::factory()->create();
     $deptB = Department::factory()->create();
     $adminA = User::factory()->create(['department_id' => $deptA->id]);
     $adminA->assignRole(Role::Admin->value);
-    $employeeB = User::factory()->create(['department_id' => $deptB->id]);
+    $userB = User::factory()->create(['department_id' => $deptB->id]);
+    $userB->assignRole(Role::User->value);
 
     $item = WorkItem::factory()->create([
         'department_id' => $deptB->id,
-        'created_by_id' => $employeeB->id,
-        'assigned_to_id' => $employeeB->id,
+        'created_by_id' => $userB->id,
+        'assigned_to_id' => $userB->id,
     ]);
 
-    $this->actingAs($adminA)->getJson("/api/work-items/{$item->id}")->assertStatus(403);
+    $this->actingAs($adminA)->getJson("/api/work-items/{$item->id}")->assertOk();
 });
 
-it("prevents an admin from creating a work item in another department", function () {
+it('allows an admin to create a work item assigned to a user in any department', function () {
     $deptA = Department::factory()->create();
     $deptB = Department::factory()->create();
     $adminA = User::factory()->create(['department_id' => $deptA->id]);
     $adminA->assignRole(Role::Admin->value);
-    $employeeB = User::factory()->create(['department_id' => $deptB->id]);
+    $userB = User::factory()->create(['department_id' => $deptB->id]);
+    $userB->assignRole(Role::User->value);
 
     $response = $this->actingAs($adminA)->postJson('/api/work-items', [
         'department_id' => $deptB->id,
         'entry_type' => 'task',
         'assigned_by' => 'self',
-        'assigned_to_id' => $employeeB->id,
+        'assigned_to_id' => $userB->id,
         'source' => 'internal',
         'priority' => 'low',
-        'subject' => 'Cross department attempt',
-        'description' => 'Should be rejected',
+        'subject' => 'Cross department task',
+        'description' => 'Admin authorization is global, not department-scoped',
     ]);
 
-    $response->assertStatus(422);
+    $response->assertStatus(201);
 });
 
-it("excludes another department's work items from an admin's index listing", function () {
+it("includes work items from every department in an admin's index listing", function () {
     $deptA = Department::factory()->create();
     $deptB = Department::factory()->create();
     $adminA = User::factory()->create(['department_id' => $deptA->id]);
     $adminA->assignRole(Role::Admin->value);
-    $employeeA = User::factory()->create(['department_id' => $deptA->id]);
-    $employeeB = User::factory()->create(['department_id' => $deptB->id]);
+    $userA = User::factory()->create(['department_id' => $deptA->id]);
+    $userB = User::factory()->create(['department_id' => $deptB->id]);
 
     $itemA = WorkItem::factory()->create([
         'department_id' => $deptA->id,
         'created_by_id' => $adminA->id,
-        'assigned_to_id' => $employeeA->id,
+        'assigned_to_id' => $userA->id,
     ]);
     $itemB = WorkItem::factory()->create([
         'department_id' => $deptB->id,
-        'created_by_id' => $employeeB->id,
-        'assigned_to_id' => $employeeB->id,
+        'created_by_id' => $userB->id,
+        'assigned_to_id' => $userB->id,
     ]);
 
     $response = $this->actingAs($adminA)->getJson('/api/work-items');
@@ -126,19 +129,19 @@ it("excludes another department's work items from an admin's index listing", fun
     $response->assertOk();
     $ids = collect($response->json('data'))->pluck('id');
     expect($ids)->toContain($itemA->id);
-    expect($ids)->not->toContain($itemB->id);
+    expect($ids)->toContain($itemB->id);
 });
 
-it('only shows an employee their own assigned work items in the index listing', function () {
+it('only shows a user their own assigned work items in the index listing', function () {
     $department = Department::factory()->create();
-    $employee = User::factory()->create(['department_id' => $department->id]);
-    $employee->assignRole(Role::Employee->value);
+    $user = User::factory()->create(['department_id' => $department->id]);
+    $user->assignRole(Role::User->value);
     $colleague = User::factory()->create(['department_id' => $department->id]);
 
     $ownItem = WorkItem::factory()->create([
         'department_id' => $department->id,
         'created_by_id' => $colleague->id,
-        'assigned_to_id' => $employee->id,
+        'assigned_to_id' => $user->id,
     ]);
     $othersItem = WorkItem::factory()->create([
         'department_id' => $department->id,
@@ -146,7 +149,7 @@ it('only shows an employee their own assigned work items in the index listing', 
         'assigned_to_id' => $colleague->id,
     ]);
 
-    $response = $this->actingAs($employee)->getJson('/api/work-items');
+    $response = $this->actingAs($user)->getJson('/api/work-items');
 
     $response->assertOk();
     $ids = collect($response->json('data'))->pluck('id');
@@ -159,18 +162,18 @@ it('allows a superadmin to view work items across all departments', function () 
     $deptB = Department::factory()->create();
     $superAdmin = User::factory()->create();
     $superAdmin->assignRole(Role::SuperAdmin->value);
-    $employeeA = User::factory()->create(['department_id' => $deptA->id]);
-    $employeeB = User::factory()->create(['department_id' => $deptB->id]);
+    $userA = User::factory()->create(['department_id' => $deptA->id]);
+    $userB = User::factory()->create(['department_id' => $deptB->id]);
 
     WorkItem::factory()->create([
         'department_id' => $deptA->id,
-        'created_by_id' => $employeeA->id,
-        'assigned_to_id' => $employeeA->id,
+        'created_by_id' => $userA->id,
+        'assigned_to_id' => $userA->id,
     ]);
     WorkItem::factory()->create([
         'department_id' => $deptB->id,
-        'created_by_id' => $employeeB->id,
-        'assigned_to_id' => $employeeB->id,
+        'created_by_id' => $userB->id,
+        'assigned_to_id' => $userB->id,
     ]);
 
     $response = $this->actingAs($superAdmin)->getJson('/api/work-items');

@@ -2,7 +2,6 @@
 
 namespace App\Http\Resources;
 
-use App\Models\WorkItem;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -10,24 +9,49 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class UserResource extends JsonResource
 {
     /**
+     * Set when the caller already knows this resource represents the
+     * authenticated actor (e.g. AuthController::login(), where the request
+     * carries no bearer token yet, so $request->user() is unavailable).
+     */
+    private bool $isSelf = false;
+
+    public function asSelf(): static
+    {
+        $this->isSelf = true;
+
+        return $this;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
+        $isSelf = $this->isSelf || ($request->user() && $this->id === $request->user()->id);
+
         return [
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
             'department_id' => $this->department_id,
+            'manager_id' => $this->manager_id,
             'roles' => $this->getRoleNames(),
             'created_at' => $this->created_at,
 
             // Only meaningful — and only included — when this resource represents
             // the authenticated user themself, not an entry in a users list/dropdown.
+            // Every authenticated user can create a work item now (at minimum via
+            // self-assignment), so this is unconditionally true rather than a
+            // policy check — TaskAssignmentAuthorizer is only ever consulted
+            // against a specific target user, never a bare "can create?" ability.
             'abilities' => $this->when(
-                $request->user() && $this->id === $request->user()->id,
+                $isSelf,
                 fn () => [
-                    'can_create_work_items' => $request->user()->can('create', WorkItem::class),
+                    'can_create_work_items' => true,
+                    // Whether this plain `user` has at least one direct report — drives
+                    // whether the Task Register nav item/route is worth showing them at
+                    // all, versus just the self-assign button on My Tasks.
+                    'is_reporting_manager' => $this->reports()->exists(),
                 ],
             ),
         ];

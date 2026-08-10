@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\Role;
 use App\Enums\WorkItemStatus;
 use App\Models\SlaSetting;
 use App\Models\User;
@@ -10,7 +9,6 @@ use App\Models\WorkItem;
 use App\Repositories\Contracts\WorkItemRepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class WorkItemService
 {
@@ -48,9 +46,6 @@ class WorkItemService
     public function create(array $attributes, User $actor): WorkItem
     {
         return DB::transaction(function () use ($attributes, $actor) {
-            $this->guardDepartmentScope($actor, $attributes['department_id']);
-            $this->guardAssigneeInDepartment($attributes['assigned_to_id'], $attributes['department_id']);
-
             $number = $this->items->nextWorkNumber();
 
             $attributes['work_id'] = sprintf('W%04d', $number);
@@ -106,8 +101,6 @@ class WorkItemService
     public function reassign(WorkItem $item, string $newAssigneeId, ?string $note, User $actor): WorkItem
     {
         return DB::transaction(function () use ($item, $newAssigneeId, $note, $actor) {
-            $this->guardAssigneeInDepartment($newAssigneeId, $item->department_id);
-
             $previousAssigneeId = $item->assigned_to_id;
             $item->assigned_to_id = $newAssigneeId;
             $item->save();
@@ -167,35 +160,4 @@ class WorkItemService
         ]);
     }
 
-    /**
-     * Admins may only create/reassign within their own department.
-     *
-     * @throws ValidationException
-     */
-    private function guardDepartmentScope(User $actor, string $departmentId): void
-    {
-        if ($actor->hasRole(Role::SuperAdmin->value)) {
-            return;
-        }
-
-        if ($departmentId !== $actor->department_id) {
-            throw ValidationException::withMessages([
-                'department_id' => ['You may only create work items within your own department.'],
-            ]);
-        }
-    }
-
-    /**
-     * @throws ValidationException
-     */
-    private function guardAssigneeInDepartment(string $assigneeId, string $departmentId): void
-    {
-        $assignee = User::find($assigneeId);
-
-        if (! $assignee || $assignee->department_id !== $departmentId) {
-            throw ValidationException::withMessages([
-                'assigned_to_id' => ['The assignee must belong to the work item\'s department.'],
-            ]);
-        }
-    }
 }

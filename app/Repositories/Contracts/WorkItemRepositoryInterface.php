@@ -21,7 +21,7 @@ interface WorkItemRepositoryInterface
     public function update(WorkItem $item, array $attributes): WorkItem;
 
     /**
-     * Returns a role/department-scoped, filtered, paginated list for the given actor.
+     * Returns a role-scoped, filtered, paginated list for the given actor.
      * This is the ONE place list-level scoping lives (alongside WorkItemPolicy for
      * single-item authorization) — no ad-hoc where() clauses in controllers/services.
      *
@@ -37,8 +37,8 @@ interface WorkItemRepositoryInterface
 
     /**
      * Status-bucketed counts (+ overdue) for the given actor's scope — the
-     * same role/department scoping paginate() applies, never all-departments
-     * data leaking into an admin's or employee's dashboard.
+     * same role scoping paginate() applies, never another user's data
+     * leaking into a plain user's dashboard.
      *
      * @return array{total: int, open: int, in_progress: int, pending: int, closed: int, overdue: int}
      */

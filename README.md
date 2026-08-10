@@ -5,8 +5,12 @@ Laravel 12 API backend for TaskDesk.
 - **Phase 1**: architectural skeleton — auth, roles, base SOLID patterns.
 - **Phase 2**: Task Register — the task/support-call log, with a full status
   state machine, audit timeline, and department/role-scoped access.
+- **Phase 3**: role model simplified to `superadmin` / `admin` / `user`; department is no
+  longer an authorization boundary. Task assignment is instead governed by a `manager_id`
+  reporting hierarchy — see [Roles and task assignment](#roles-and-task-assignment) below.
 
-Dashboard KPIs, Reports, Search, Knowledge Base, and notifications are still out of scope.
+Dashboard rollups by hierarchy, Reports, Search, Knowledge Base, and notifications are still out
+of scope.
 
 ## Stack
 
@@ -63,22 +67,28 @@ Dashboard KPIs, Reports, Search, Knowledge Base, and notifications are still out
    ```
 
    This seeds:
-   - The three roles (`superadmin`, `admin`, `employee`)
-   - Two departments (`IT Support` / `ITS`, `Finance` / `FIN`)
+   - The three roles (`superadmin`, `admin`, `user`)
+   - Two departments (`IT Support` / `ITS`, `Finance` / `FIN`) — categorization only, not an
+     authorization boundary
    - A handful of branches/clients, categories, and default SLA hours (Critical=4,
      High=24, Medium=72, Low=120)
-   - Test users, all with password `password`:
+   - Test users, all with password `password`, including a 3-level `manager_id` reporting
+     chain for exercising task-assignment authorization end to end:
 
-   | Email                          | Role       | Department |
-   |----------------------------------|-----------|-----------|
-   | superadmin@taskdesk.test       | superadmin | —          |
-   | admin@taskdesk.test            | admin      | IT Support |
-   | employee@taskdesk.test         | employee   | IT Support |
-   | financeadmin@taskdesk.test     | admin      | Finance    |
-   | financeemployee@taskdesk.test  | employee   | Finance    |
+   | Email                          | Role       | Manager           | Department |
+   |----------------------------------|-----------|--------------------|-----------|
+   | superadmin@taskdesk.test       | superadmin | —                  | —          |
+   | admin@taskdesk.test            | admin      | —                  | —          |
+   | director@taskdesk.test         | user       | —                  | IT Support |
+   | manager@taskdesk.test          | user       | director           | IT Support |
+   | employee@taskdesk.test         | user       | manager            | IT Support |
+   | teammate@taskdesk.test         | user       | manager            | IT Support |
+   | financemanager@taskdesk.test   | user       | —                  | Finance    |
+   | financeemployee@taskdesk.test  | user       | financemanager     | Finance    |
 
-   The Finance pair exists specifically so department-scoping (an Admin from one
-   department cannot see another's work items) is demoable/testable out of the box.
+   `director → manager → {employee, teammate}` is a 3-level chain (director can assign
+   directly to employee/teammate); employee and teammate are peers and cannot assign to each
+   other; the Finance pair is an unrelated branch for verifying cross-hierarchy denial.
 
 6. Serve the app:
 
@@ -102,7 +112,9 @@ Dashboard KPIs, Reports, Search, Knowledge Base, and notifications are still out
 | POST   | `/api/login`  | No             | Returns a Sanctum bearer token |
 | POST   | `/api/logout` | Yes            | Revokes the current token      |
 | GET    | `/api/me`     | Yes            | Returns the authenticated user |
-| GET    | `/api/users`  | Yes (superadmin/admin) | Example role-gated endpoint (returns 403 for `employee`) |
+| GET    | `/api/users`  | Yes (superadmin/admin) | Example role-gated endpoint (returns 403 for a plain `user`) |
+| GET    | `/api/users/me/assignable` | Yes | The actor's own record plus everyone they may assign a task to — descendants for a plain user, everyone for admin/superadmin |
+| PATCH  | `/api/users/{id}/manager` | Yes (superadmin/admin) | Sets/changes a user's `manager_id`; returns 422 if it would create a cycle |
 
 Authenticate subsequent requests with `Authorization: Bearer <token>`.
 
@@ -110,12 +122,12 @@ Authenticate subsequent requests with `Authorization: Bearer <token>`.
 
 | Method | Endpoint                          | Description                                            |
 |--------|------------------------------------|----------------------------------------------------------|
-| GET    | `/api/work-items`                 | Paginated, filterable, sortable list (scoped by role/department) |
-| POST   | `/api/work-items`                 | Create (superadmin/admin only)                          |
+| GET    | `/api/work-items`                 | Paginated, filterable, sortable list (scoped by role) |
+| POST   | `/api/work-items`                 | Create — any authenticated user, gated per-assignee by `TaskAssignmentAuthorizer` |
 | GET    | `/api/work-items/{id}`            | Detail, including full timeline history                 |
-| PATCH  | `/api/work-items/{id}`            | Update fields (employees may only touch `resolution`/`remarks`) |
+| PATCH  | `/api/work-items/{id}`            | Update fields (a plain `user` may only touch `resolution`/`remarks`) |
 | PATCH  | `/api/work-items/{id}/status`     | Status transition, via the state machine                |
-| PATCH  | `/api/work-items/{id}/reassign`   | Reassignment (superadmin/admin only)                     |
+| PATCH  | `/api/work-items/{id}/reassign`   | Reassignment — gated per-target by `TaskAssignmentAuthorizer` |
 | DELETE | `/api/work-items/{id}`            | Logical delete — sets `status = deleted`, row is never removed |
 | GET/POST | `/api/departments`               | Lookup + basic create                                    |
 | GET/POST | `/api/branches`                  | Lookup + basic create                                    |
@@ -133,11 +145,33 @@ entering `in_progress`). Enforced by `App\Services\WorkItemStatusTransitioner` �
 return a 422, and closing requires `resolution` to be set. Every status change and reassignment
 writes a row to `work_item_timelines` (actor, from/to status, optional note).
 
-**Authorization**: superadmin sees/edits everything; admin is scoped to their own department;
-employees can only view/update (`resolution`/`remarks`/status) items assigned to them and cannot
-reassign or delete. This lives in exactly two places: `App\Policies\WorkItemPolicy` (single-item
-checks) and `EloquentWorkItemRepository::paginate()` (list-level scoping) — no ad-hoc `where()`
-clauses elsewhere. Deleted items (`status = deleted`) are excluded from every list automatically.
+**Authorization**: superadmin and admin see/edit everything, globally — role authorization is a
+simple check, never conditioned on department. A plain `user` can only view/update
+(`resolution`/`remarks`/status) items assigned to them and cannot reassign or delete. This lives in
+exactly two places: `App\Policies\WorkItemPolicy` (single-item checks) and
+`EloquentWorkItemRepository::paginate()` (list-level scoping) — no ad-hoc `where()` clauses
+elsewhere. Deleted items (`status = deleted`) are excluded from every list automatically.
+
+## Roles and task assignment
+
+Three roles: `superadmin` and `admin` are global (not tied to a department) and can assign a task
+to anyone. Everyone else is a plain `user` — "manager" is not a role, it's a position in the
+reporting hierarchy (a `user` who has other users reporting to them via `manager_id`).
+
+**Who can assign a task to user X**: X themself (always), any of X's managers at any depth up the
+chain, or any admin/superadmin. This is decided in exactly one place —
+`App\Services\TaskAssignmentAuthorizer::canAssign()` — and `WorkItemPolicy`/`WorkItemController`
+delegate to it for every create/reassign check rather than duplicating the rule.
+
+**`App\Services\HierarchyService`** is the single source of truth for all `manager_id` traversal
+(ancestors, descendants, cycle detection), implemented with `WITH RECURSIVE` CTEs rather than
+looping in PHP — no other class writes a raw recursive query against `manager_id`. Setting a
+`manager_id` is checked against `wouldCreateCycle()` on every change (`PATCH
+/api/users/{id}/manager`), not just at user creation.
+
+`department_id` on `users` is nullable and used only for categorization/reporting — it is never an
+authorization boundary. `GET /api/users/me/assignable` backs the frontend's "Assign To" dropdown so
+it never has to re-derive the hierarchy rules itself.
 
 **The frontend never re-derives any of these rules.** Every `WorkItem` API response includes:
 - `permissions` — `{ can_update, can_update_status, can_reassign, can_delete }`, computed by
@@ -196,7 +230,14 @@ Feature tests cover:
 - The full valid status transition chain, and rejection of invalid transitions (422)
 - Closing a work item without a `resolution` failing
 - Every status change and reassignment writing a `work_item_timelines` row
-- An employee unable to view/update another employee's work item, or reassign
-- An admin unable to view or create work items in another department
-- List-level department/assignee scoping (admin sees only their department; employee sees only
-  their own items; superadmin sees everything)
+- A plain user unable to view/update another user's work item, or reassign an item to someone
+  they're not authorized to assign
+- Admin/superadmin authorization is global — view, create, and delete work items in any department
+- List-level scoping (admin/superadmin see everything; a plain user sees only their own items)
+- Task assignment authorization (`tests/Feature/WorkItems/TaskAssignmentAuthorizationTest.php`):
+  self-assignment always succeeds; a direct manager can assign to their direct report; a manager
+  three levels up can assign directly to a report three levels down (full-chain traversal, not just
+  one level); peers cannot assign to each other; an unrelated user in a different branch of the
+  hierarchy cannot assign even within the same department; admin/superadmin can assign to anyone;
+  a `manager_id` change that would create a cycle is rejected with a 422; `HierarchyService`
+  returns full-depth ancestor/descendant lists for a 3+ level chain

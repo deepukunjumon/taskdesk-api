@@ -26,6 +26,22 @@ it('logs in a user with valid credentials and returns a token', function () {
         ->assertJsonStructure(['data' => ['user', 'token']]);
 });
 
+it('includes abilities on the login response, not just /api/me', function () {
+    $manager = User::factory()->create([
+        'email' => 'manager@taskdesk.test',
+        'password' => 'password',
+    ]);
+    $manager->assignRole(Role::User->value);
+    User::factory()->create(['manager_id' => $manager->id])->assignRole(Role::User->value);
+
+    $response = $this->postJson('/api/login', [
+        'email' => 'manager@taskdesk.test',
+        'password' => 'password',
+    ]);
+
+    $response->assertOk()->assertJsonPath('data.user.abilities.is_reporting_manager', true);
+});
+
 it('rejects login with invalid credentials', function () {
     User::factory()->create([
         'email' => 'superadmin@taskdesk.test',

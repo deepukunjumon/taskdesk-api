@@ -27,6 +27,7 @@ class User extends Authenticatable
         'email',
         'password',
         'department_id',
+        'manager_id',
     ];
 
     /**
@@ -55,5 +56,15 @@ class User extends Authenticatable
     public function department(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function manager(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'manager_id');
+    }
+
+    public function reports(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(User::class, 'manager_id');
     }
 }

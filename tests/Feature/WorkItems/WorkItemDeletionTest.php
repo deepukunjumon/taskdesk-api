@@ -62,41 +62,42 @@ it('excludes a deleted work item from the index listing', function () {
     expect($ids)->not->toContain($item->id);
 });
 
-it('prevents an employee from deleting a work item', function () {
+it('prevents a plain user from deleting a work item', function () {
     $department = Department::factory()->create();
-    $employee = User::factory()->create(['department_id' => $department->id]);
-    $employee->assignRole(Role::Employee->value);
+    $user = User::factory()->create(['department_id' => $department->id]);
+    $user->assignRole(Role::User->value);
 
     $item = WorkItem::factory()->create([
         'department_id' => $department->id,
-        'created_by_id' => $employee->id,
-        'assigned_to_id' => $employee->id,
+        'created_by_id' => $user->id,
+        'assigned_to_id' => $user->id,
         'status' => WorkItemStatus::Open->value,
     ]);
 
-    $response = $this->actingAs($employee)->deleteJson("/api/work-items/{$item->id}");
+    $response = $this->actingAs($user)->deleteJson("/api/work-items/{$item->id}");
 
     $response->assertStatus(403);
     $this->assertDatabaseHas('work_items', ['id' => $item->id, 'status' => WorkItemStatus::Open->value]);
 });
 
-it("prevents an admin from deleting another department's work item", function () {
+it("allows an admin to delete another department's work item", function () {
     $deptA = Department::factory()->create();
     $deptB = Department::factory()->create();
     $adminA = User::factory()->create(['department_id' => $deptA->id]);
     $adminA->assignRole(Role::Admin->value);
-    $employeeB = User::factory()->create(['department_id' => $deptB->id]);
+    $userB = User::factory()->create(['department_id' => $deptB->id]);
 
     $item = WorkItem::factory()->create([
         'department_id' => $deptB->id,
-        'created_by_id' => $employeeB->id,
-        'assigned_to_id' => $employeeB->id,
+        'created_by_id' => $userB->id,
+        'assigned_to_id' => $userB->id,
         'status' => WorkItemStatus::Open->value,
     ]);
 
     $response = $this->actingAs($adminA)->deleteJson("/api/work-items/{$item->id}");
 
-    $response->assertStatus(403);
+    $response->assertOk();
+    expect($item->fresh()->status)->toBe(WorkItemStatus::Deleted);
 });
 
 it('rejects deleting a work item that is already deleted', function () {

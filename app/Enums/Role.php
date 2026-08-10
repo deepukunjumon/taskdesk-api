@@ -6,7 +6,7 @@ enum Role: string
 {
     case SuperAdmin = 'superadmin';
     case Admin = 'admin';
-    case Employee = 'employee';
+    case User = 'user';
 
     /**
      * @return list<string>
