@@ -3,7 +3,7 @@
 Laravel 12 API backend for TaskDesk.
 
 - **Phase 1**: architectural skeleton — auth, roles, base SOLID patterns.
-- **Phase 2**: Work Register — the task/support-call log, with a full status
+- **Phase 2**: Task Register — the task/support-call log, with a full status
   state machine, audit timeline, and department/role-scoped access.
 
 Dashboard KPIs, Reports, Search, Knowledge Base, and notifications are still out of scope.
@@ -106,7 +106,7 @@ Dashboard KPIs, Reports, Search, Knowledge Base, and notifications are still out
 
 Authenticate subsequent requests with `Authorization: Bearer <token>`.
 
-## Work Register endpoints
+## Task Register endpoints
 
 | Method | Endpoint                          | Description                                            |
 |--------|------------------------------------|----------------------------------------------------------|

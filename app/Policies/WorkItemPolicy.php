@@ -72,7 +72,7 @@ class WorkItemPolicy
 
     public function delete(User $user, WorkItem $item): bool
     {
-        return $this->isEditable($item) && $this->canManage($user, $item);
+        return $this->isDeletable($item) && $this->canManage($user, $item);
     }
 
     /**
@@ -93,7 +93,12 @@ class WorkItemPolicy
 
     private function isEditable(WorkItem $item): bool
     {
-        return $item->status !== WorkItemStatus::Deleted;
+        return ($item->status !== WorkItemStatus::Deleted && $item->status !== WorkItemStatus::Closed);
+    }
+
+    private function isDeletable(WorkItem $item): bool
+    {
+        return ($item->status !== WorkItemStatus::Deleted && $item->status !== WorkItemStatus::Closed);
     }
 
     /** Superadmin or an admin within the item's own department — never an employee. */
