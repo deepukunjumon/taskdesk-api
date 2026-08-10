@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\AssignedBy;
 use App\Enums\EntryType;
 use App\Enums\Priority;
 use App\Enums\Source;
@@ -22,7 +21,7 @@ class WorkItem extends Model
         'work_id',
         'department_id',
         'entry_type',
-        'assigned_by',
+        'assigned_by_id',
         'assigned_to_id',
         'created_by_id',
         'source',
@@ -43,7 +42,6 @@ class WorkItem extends Model
     {
         return [
             'entry_type' => EntryType::class,
-            'assigned_by' => AssignedBy::class,
             'source' => Source::class,
             'priority' => Priority::class,
             'status' => WorkItemStatus::class,
@@ -71,6 +69,11 @@ class WorkItem extends Model
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to_id');
+    }
+
+    public function assignedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_by_id');
     }
 
     public function createdBy(): BelongsTo

@@ -30,7 +30,6 @@ class WorkItemPolicy
      */
     private const FULL_EDIT_FIELDS = [
         'entry_type',
-        'assigned_by',
         'source',
         'branch_id',
         'category_id',

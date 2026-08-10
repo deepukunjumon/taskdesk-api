@@ -16,7 +16,6 @@ function createWorkItemAs(\Illuminate\Testing\TestResponse|\Tests\TestCase $test
     return $test->actingAs($actor)->postJson('/api/work-items', [
         'department_id' => $department->id,
         'entry_type' => 'task',
-        'assigned_by' => 'self',
         'assigned_to_id' => $assignTo->id,
         'source' => 'internal',
         'priority' => 'low',

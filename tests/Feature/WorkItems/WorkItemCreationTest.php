@@ -33,7 +33,6 @@ it('generates unique, strictly sequential, zero-padded work IDs across many rapi
         $item = $service->create([
             'department_id' => $department->id,
             'entry_type' => 'task',
-            'assigned_by' => 'self',
             'assigned_to_id' => $employee->id,
             'source' => 'internal',
             'priority' => Priority::Low->value,
@@ -79,4 +78,69 @@ it('records a "created" timeline entry when a work item is created', function ()
         'action' => 'created',
         'to_status' => 'open',
     ]);
+});
+
+it('sets assigned_by to the creator when self-assigning', function () {
+    $department = Department::factory()->create();
+    $user = User::factory()->create(['department_id' => $department->id]);
+    $user->assignRole(Role::User->value);
+
+    $response = $this->actingAs($user)->postJson('/api/work-items', [
+        'department_id' => $department->id,
+        'entry_type' => 'task',
+        'assigned_to_id' => $user->id,
+        'source' => 'internal',
+        'priority' => Priority::Low->value,
+        'subject' => 'Self task',
+        'description' => 'assigned_by should be the actor, a real person',
+    ]);
+
+    $response->assertStatus(201)
+        ->assertJsonPath('data.assigned_by.id', $user->id)
+        ->assertJsonPath('data.assigned_by.name', $user->name);
+});
+
+it('sets assigned_by to the creator, not the assignee, when delegating to someone else', function () {
+    $department = Department::factory()->create();
+    $admin = User::factory()->create(['department_id' => $department->id]);
+    $admin->assignRole(Role::Admin->value);
+    $employee = User::factory()->create(['department_id' => $department->id]);
+    $employee->assignRole(Role::User->value);
+
+    $response = $this->actingAs($admin)->postJson('/api/work-items', [
+        'department_id' => $department->id,
+        'entry_type' => 'task',
+        'assigned_to_id' => $employee->id,
+        'source' => 'internal',
+        'priority' => Priority::Low->value,
+        'subject' => 'Delegated task',
+        'description' => 'assigned_by should be the admin who created it, not the employee',
+    ]);
+
+    $response->assertStatus(201)
+        ->assertJsonPath('data.assigned_by.id', $admin->id)
+        ->assertJsonPath('data.assigned_by.name', $admin->name)
+        ->assertJsonPath('data.assigned_to.id', $employee->id);
+});
+
+it('ignores a client-supplied assigned_by_id — it is always computed from the actor', function () {
+    $department = Department::factory()->create();
+    $admin = User::factory()->create(['department_id' => $department->id]);
+    $admin->assignRole(Role::Admin->value);
+    $employee = User::factory()->create(['department_id' => $department->id]);
+    $employee->assignRole(Role::User->value);
+    $impersonated = User::factory()->create();
+
+    $response = $this->actingAs($admin)->postJson('/api/work-items', [
+        'department_id' => $department->id,
+        'entry_type' => 'task',
+        'assigned_to_id' => $employee->id,
+        'assigned_by_id' => $impersonated->id,
+        'source' => 'internal',
+        'priority' => Priority::Low->value,
+        'subject' => 'Should ignore client-supplied assigned_by_id',
+        'description' => 'assigned_by must always reflect the real actor',
+    ]);
+
+    $response->assertStatus(201)->assertJsonPath('data.assigned_by.id', $admin->id);
 });

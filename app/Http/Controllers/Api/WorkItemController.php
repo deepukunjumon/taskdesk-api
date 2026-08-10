@@ -62,6 +62,7 @@ class WorkItemController extends Controller
             'branch',
             'category',
             'assignedTo',
+            'assignedBy',
             'createdBy',
             'timelines.actor',
         ]);

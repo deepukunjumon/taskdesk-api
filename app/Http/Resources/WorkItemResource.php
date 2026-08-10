@@ -23,7 +23,10 @@ class WorkItemResource extends JsonResource
             'work_id' => $this->work_id,
             'department' => new DepartmentResource($this->whenLoaded('department')),
             'entry_type' => $this->entry_type,
-            'assigned_by' => $this->assigned_by,
+            'assigned_by' => $this->whenLoaded('assignedBy', fn () => $this->assignedBy ? [
+                'id' => $this->assignedBy->id,
+                'name' => $this->assignedBy->name,
+            ] : null),
             'assigned_to' => $this->whenLoaded('assignedTo', fn () => [
                 'id' => $this->assignedTo?->id,
                 'name' => $this->assignedTo?->name,

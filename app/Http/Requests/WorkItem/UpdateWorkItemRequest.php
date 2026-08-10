@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\WorkItem;
 
-use App\Enums\AssignedBy;
 use App\Enums\EntryType;
 use App\Enums\Priority;
 use App\Enums\Source;
@@ -34,7 +33,6 @@ class UpdateWorkItemRequest extends FormRequest
 
         $allRules = [
             'entry_type' => ['sometimes', Rule::enum(EntryType::class)],
-            'assigned_by' => ['sometimes', Rule::enum(AssignedBy::class)],
             'source' => ['sometimes', Rule::enum(Source::class)],
             'branch_id' => ['sometimes', 'nullable', 'uuid', 'exists:branches,id'],
             'category_id' => ['sometimes', 'nullable', 'uuid', 'exists:categories,id'],

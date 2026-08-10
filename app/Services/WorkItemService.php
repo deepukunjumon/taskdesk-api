@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class WorkItemService
 {
-    private const EAGER = ['department', 'branch', 'category', 'assignedTo', 'createdBy'];
+    private const EAGER = ['department', 'branch', 'category', 'assignedTo', 'assignedBy', 'createdBy'];
 
     public function __construct(
         private readonly WorkItemRepositoryInterface $items,
@@ -50,6 +50,7 @@ class WorkItemService
 
             $attributes['work_id'] = sprintf('W%04d', $number);
             $attributes['created_by_id'] = $actor->id;
+            $attributes['assigned_by_id'] = $actor->id;
             $attributes['status'] = WorkItemStatus::Open->value;
             $attributes['sla_due_at'] = $this->computeSlaDueAt($attributes['priority']);
 
@@ -103,6 +104,7 @@ class WorkItemService
         return DB::transaction(function () use ($item, $newAssigneeId, $note, $actor) {
             $previousAssigneeId = $item->assigned_to_id;
             $item->assigned_to_id = $newAssigneeId;
+            $item->assigned_by_id = $actor->id;
             $item->save();
 
             $historyNote = trim(sprintf(

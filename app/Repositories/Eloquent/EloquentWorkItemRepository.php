@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 
 class EloquentWorkItemRepository implements WorkItemRepositoryInterface
 {
-    private const EAGER = ['department', 'branch', 'category', 'assignedTo', 'createdBy'];
+    private const EAGER = ['department', 'branch', 'category', 'assignedTo', 'assignedBy', 'createdBy'];
 
     private const SORTABLE = ['created_at', 'priority', 'status', 'work_id'];
 

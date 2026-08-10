@@ -94,7 +94,6 @@ it('allows an admin to create a work item assigned to a user in any department',
     $response = $this->actingAs($adminA)->postJson('/api/work-items', [
         'department_id' => $deptB->id,
         'entry_type' => 'task',
-        'assigned_by' => 'self',
         'assigned_to_id' => $userB->id,
         'source' => 'internal',
         'priority' => 'low',
