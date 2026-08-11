@@ -21,7 +21,7 @@ beforeEach(function () {
  * EloquentWorkItemRepository::nextWorkNumber(), which serializes concurrent
  * DB connections at the database level.
  */
-it('generates unique, strictly sequential, zero-padded work IDs across many rapid creations', function () {
+it('generates unique, strictly sequential, zero-padded task IDs across many rapid creations', function () {
     $department = Department::factory()->create();
     $admin = User::factory()->create(['department_id' => $department->id]);
     $admin->assignRole(Role::Admin->value);
