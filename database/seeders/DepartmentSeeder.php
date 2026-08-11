@@ -9,7 +9,11 @@ class DepartmentSeeder extends Seeder
 {
     public function run(): void
     {
-        Department::firstOrCreate(['code' => 'ITS'], ['name' => 'IT Support']);
-        Department::firstOrCreate(['code' => 'FIN'], ['name' => 'Finance']);
+        Department::firstOrCreate(['code' => 'TECH'], ['name' => 'Technical']);
+        Department::firstOrCreate(['code' => 'SOFT'], ['name' => 'Software Development']);
+        Department::firstOrCreate(['code' => 'CUST'], ['name' => 'Customer Care']);
+        Department::firstOrCreate(['code' => 'HR'], ['name' => 'HR & Administration']);
+        Department::firstOrCreate(['code' => 'ACC'], ['name' => 'Accounts']);
+        Department::firstOrCreate(['code' => 'ADMIN'], ['name' => 'Administration']);
     }
 }
