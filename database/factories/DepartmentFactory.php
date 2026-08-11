@@ -20,6 +20,7 @@ class DepartmentFactory extends Factory
         return [
             'name' => fake()->unique()->company(),
             'code' => strtoupper(fake()->unique()->lexify('???')),
+            'is_active' => true,
         ];
     }
 }

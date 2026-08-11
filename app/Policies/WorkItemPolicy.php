@@ -60,9 +60,9 @@ class WorkItemPolicy
         return $this->isInScope($user, $item);
     }
 
-    public function create(User $user, User $target): bool
+    public function create(User $user, User $target, ?string $departmentId = null): bool
     {
-        return $this->assignmentAuthorizer->canAssign($user, $target);
+        return $this->assignmentAuthorizer->canAssign($user, $target, $departmentId);
     }
 
     public function update(User $user, WorkItem $item): bool
@@ -77,7 +77,8 @@ class WorkItemPolicy
 
     public function reassign(User $user, WorkItem $item, User $newAssignee): bool
     {
-        return $this->isEditable($item) && $this->assignmentAuthorizer->canAssign($user, $newAssignee);
+        return $this->isEditable($item)
+            && $this->assignmentAuthorizer->canAssign($user, $newAssignee, $item->department_id);
     }
 
     /**
@@ -141,6 +142,13 @@ class WorkItemPolicy
             return true;
         }
 
-        return $item->assigned_to_id === $user->id;
+        if ($item->assigned_to_id === $user->id || $item->assigned_by_id === $user->id) {
+            return true;
+        }
+
+        // Covers a report's own self-assigned task, which has no assigned_by
+        // tie to the manager at all — matches the list-level scoping in
+        // EloquentWorkItemRepository::scopeToActor().
+        return $this->hierarchy->getDescendants($user)->contains('id', $item->assigned_to_id);
     }
 }

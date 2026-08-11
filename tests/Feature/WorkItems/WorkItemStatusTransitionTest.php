@@ -171,3 +171,26 @@ it('writes a reassigned timeline row through the dedicated reassign endpoint', f
         'action' => 'reassigned',
     ]);
 });
+
+it('updates assigned_by to whoever performed the reassignment, not who created the task', function () {
+    $department = Department::factory()->create();
+    $creator = User::factory()->create(['department_id' => $department->id]);
+    $creator->assignRole(Role::Admin->value);
+    $reassigner = User::factory()->create(['department_id' => $department->id]);
+    $reassigner->assignRole(Role::Admin->value);
+    $employeeA = User::factory()->create(['department_id' => $department->id]);
+    $employeeB = User::factory()->create(['department_id' => $department->id]);
+
+    $item = WorkItem::factory()->create([
+        'department_id' => $department->id,
+        'created_by_id' => $creator->id,
+        'assigned_to_id' => $employeeA->id,
+        'assigned_by_id' => $creator->id,
+    ]);
+
+    $this->actingAs($reassigner)->patchJson("/api/work-items/{$item->id}/reassign", [
+        'assigned_to_id' => $employeeB->id,
+    ])->assertOk();
+
+    expect($item->fresh()->assigned_by_id)->toBe($reassigner->id);
+});

@@ -20,7 +20,7 @@ class StoreBranchRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', 'unique:branches,code'],
+            'code' => ['required', 'string', 'max:50', Rule::unique('branches', 'code')->whereNull('deleted_at')],
             'type' => ['required', Rule::enum(BranchType::class)],
         ];
     }

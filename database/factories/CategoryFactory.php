@@ -21,6 +21,7 @@ class CategoryFactory extends Factory
         return [
             'name' => fake()->unique()->word(),
             'department_id' => Department::factory(),
+            'is_active' => true,
         ];
     }
 }

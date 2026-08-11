@@ -221,3 +221,91 @@ it('TaskAssignmentAuthorizer denies two users with no ancestor relationship', fu
 
     expect(app(TaskAssignmentAuthorizer::class)->canAssign($a, $b))->toBeFalse();
 });
+
+it('rejects a manager assigning a task under one department to a report who belongs to a different department', function () {
+    $technical = Department::factory()->create();
+    $software = Department::factory()->create();
+
+    $manager = User::factory()->create(['department_id' => $technical->id]);
+    $manager->assignRole(Role::User->value);
+    $reportInOtherDept = User::factory()->create([
+        'department_id' => $software->id,
+        'manager_id' => $manager->id,
+    ]);
+    $reportInOtherDept->assignRole(Role::User->value);
+
+    // $reportInOtherDept is a genuine hierarchy descendant, but the task is
+    // being filed under $technical, and the report belongs to $software.
+    createWorkItemAs($this, $manager, $reportInOtherDept, $technical)->assertStatus(403);
+});
+
+it('allows a manager to assign within the department their report actually belongs to', function () {
+    $technical = Department::factory()->create();
+    $software = Department::factory()->create();
+
+    $manager = User::factory()->create(['department_id' => $technical->id]);
+    $manager->assignRole(Role::User->value);
+    $reportInOtherDept = User::factory()->create([
+        'department_id' => $software->id,
+        'manager_id' => $manager->id,
+    ]);
+    $reportInOtherDept->assignRole(Role::User->value);
+
+    createWorkItemAs($this, $manager, $reportInOtherDept, $software)->assertStatus(201);
+});
+
+it('rejects reassigning a work item to a report outside the item\'s department', function () {
+    $technical = Department::factory()->create();
+    $software = Department::factory()->create();
+
+    $manager = User::factory()->create(['department_id' => $technical->id]);
+    $manager->assignRole(Role::User->value);
+    $reportSameDept = User::factory()->create(['department_id' => $technical->id, 'manager_id' => $manager->id]);
+    $reportSameDept->assignRole(Role::User->value);
+    $reportOtherDept = User::factory()->create(['department_id' => $software->id, 'manager_id' => $manager->id]);
+    $reportOtherDept->assignRole(Role::User->value);
+
+    $item = createWorkItemAs($this, $manager, $reportSameDept, $technical)->json('data');
+
+    $response = $this->actingAs($manager)->patchJson("/api/work-items/{$item['id']}/reassign", [
+        'assigned_to_id' => $reportOtherDept->id,
+    ]);
+
+    $response->assertStatus(403);
+});
+
+it('TaskAssignmentAuthorizer denies a hierarchy-valid target whose department does not match', function () {
+    $technical = Department::factory()->create();
+    $software = Department::factory()->create();
+
+    $manager = User::factory()->create(['department_id' => $technical->id]);
+    $manager->assignRole(Role::User->value);
+    $report = User::factory()->create(['department_id' => $software->id, 'manager_id' => $manager->id]);
+    $report->assignRole(Role::User->value);
+
+    $authorizer = app(TaskAssignmentAuthorizer::class);
+
+    expect($authorizer->canAssign($manager, $report, $technical->id))->toBeFalse();
+    expect($authorizer->canAssign($manager, $report, $software->id))->toBeTrue();
+    expect($authorizer->canAssign($manager, $report))->toBeTrue();
+});
+
+it('narrows the assignable-users endpoint to the given department', function () {
+    $technical = Department::factory()->create();
+    $software = Department::factory()->create();
+
+    $manager = User::factory()->create(['department_id' => $technical->id]);
+    $manager->assignRole(Role::User->value);
+    $reportSameDept = User::factory()->create(['department_id' => $technical->id, 'manager_id' => $manager->id]);
+    $reportSameDept->assignRole(Role::User->value);
+    $reportOtherDept = User::factory()->create(['department_id' => $software->id, 'manager_id' => $manager->id]);
+    $reportOtherDept->assignRole(Role::User->value);
+
+    $response = $this->actingAs($manager)->getJson("/api/users/me/assignable?department_id={$technical->id}");
+
+    $response->assertOk();
+    $ids = collect($response->json('data'))->pluck('id');
+
+    expect($ids)->toContain($reportSameDept->id)
+        ->not->toContain($reportOtherDept->id);
+});

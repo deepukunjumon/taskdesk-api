@@ -46,7 +46,7 @@ class WorkItemController extends Controller
     public function store(StoreWorkItemRequest $request): JsonResponse
     {
         $target = User::findOrFail($request->validated('assigned_to_id'));
-        $this->authorize('create', [WorkItem::class, $target]);
+        $this->authorize('create', [WorkItem::class, $target, $request->validated('department_id')]);
 
         $item = $this->workItems->create($request->validated(), $request->user());
 

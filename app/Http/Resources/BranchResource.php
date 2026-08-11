@@ -18,6 +18,7 @@ class BranchResource extends JsonResource
             'name' => $this->name,
             'code' => $this->code,
             'type' => $this->type,
+            'is_active' => $this->is_active,
         ];
     }
 }

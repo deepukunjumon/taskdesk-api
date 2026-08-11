@@ -5,20 +5,32 @@ namespace App\Http\Controllers\Api;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCategoryRequest;
+use App\Http\Requests\UpdateCategoryRequest;
 use App\Http\Resources\CategoryResource;
 use App\Models\Category;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Simple lookup CRUD — see DepartmentController for rationale.
+ * Simple lookup CRUD — see DepartmentController for rationale, including the
+ * soft-delete and `?include_inactive=1` conventions.
  */
 class CategoryController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
         $categories = Category::query()
-            ->when($request->query('department_id'), fn ($q, $id) => $q->where('department_id', $id))
+            // A category with no department is a common one (e.g. "General")
+            // that applies regardless of which department is selected, so it
+            // must always be included alongside the department-specific match.
+            ->when(
+                $request->query('department_id'),
+                fn ($q, $id) => $q->where(fn ($q) => $q->where('department_id', $id)->orWhereNull('department_id')),
+            )
+            ->when(
+                ! $request->boolean('include_inactive'),
+                fn ($q) => $q->where('is_active', true),
+            )
             ->orderBy('name')
             ->get();
 
@@ -32,5 +44,35 @@ class CategoryController extends Controller
         $category = Category::create($request->validated());
 
         return (new CategoryResource($category))->response()->setStatusCode(201);
+    }
+
+    public function update(UpdateCategoryRequest $request, Category $category): JsonResponse
+    {
+        abort_unless($request->user()->hasRole([Role::SuperAdmin->value, Role::Admin->value]), 403);
+
+        $category->update($request->validated());
+
+        return (new CategoryResource($category))->response();
+    }
+
+    public function toggleActive(Request $request, Category $category): JsonResponse
+    {
+        abort_unless($request->user()->hasRole([Role::SuperAdmin->value, Role::Admin->value]), 403);
+
+        $category->update(['is_active' => ! $category->is_active]);
+
+        return (new CategoryResource($category))->response();
+    }
+
+    public function destroy(Request $request, Category $category): JsonResponse
+    {
+        abort_unless($request->user()->hasRole([Role::SuperAdmin->value, Role::Admin->value]), 403);
+
+        $category->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Category deleted.',
+        ]);
     }
 }

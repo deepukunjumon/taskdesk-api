@@ -22,6 +22,7 @@ class BranchFactory extends Factory
             'name' => fake()->unique()->city(),
             'code' => strtoupper(fake()->unique()->lexify('????')),
             'type' => fake()->randomElement(BranchType::values()),
+            'is_active' => true,
         ];
     }
 }

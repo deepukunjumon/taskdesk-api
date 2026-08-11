@@ -46,12 +46,21 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/departments', [DepartmentController::class, 'index']);
     Route::post('/departments', [DepartmentController::class, 'store']);
+    Route::patch('/departments/{department}', [DepartmentController::class, 'update']);
+    Route::patch('/departments/{department}/toggle-active', [DepartmentController::class, 'toggleActive']);
+    Route::delete('/departments/{department}', [DepartmentController::class, 'destroy']);
 
     Route::get('/branches', [BranchController::class, 'index']);
     Route::post('/branches', [BranchController::class, 'store']);
+    Route::patch('/branches/{branch}', [BranchController::class, 'update']);
+    Route::patch('/branches/{branch}/toggle-active', [BranchController::class, 'toggleActive']);
+    Route::delete('/branches/{branch}', [BranchController::class, 'destroy']);
 
     Route::get('/categories', [CategoryController::class, 'index']);
     Route::post('/categories', [CategoryController::class, 'store']);
+    Route::patch('/categories/{category}', [CategoryController::class, 'update']);
+    Route::patch('/categories/{category}/toggle-active', [CategoryController::class, 'toggleActive']);
+    Route::delete('/categories/{category}', [CategoryController::class, 'destroy']);
 
     Route::get('/sla-settings', [SlaSettingController::class, 'index']);
     Route::patch('/sla-settings/{slaSetting}', [SlaSettingController::class, 'update']);

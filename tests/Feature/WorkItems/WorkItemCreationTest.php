@@ -65,7 +65,6 @@ it('records a "created" timeline entry when a work item is created', function ()
     $item = app(WorkItemService::class)->create([
         'department_id' => $department->id,
         'entry_type' => 'task',
-        'assigned_by' => 'self',
         'assigned_to_id' => $employee->id,
         'source' => 'internal',
         'priority' => Priority::Medium->value,

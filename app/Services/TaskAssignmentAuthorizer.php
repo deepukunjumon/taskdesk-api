@@ -16,7 +16,13 @@ class TaskAssignmentAuthorizer
         private readonly HierarchyService $hierarchy,
     ) {}
 
-    public function canAssign(User $actor, User $target): bool
+    /**
+     * $departmentId, when given, is the department the task is being filed
+     * under — for a non-admin actor the target must actually belong to it,
+     * so a manager can't assign into a department they don't have a report
+     * in just because the target happens to be somewhere in their hierarchy.
+     */
+    public function canAssign(User $actor, User $target, ?string $departmentId = null): bool
     {
         if ($actor->hasRole([Role::SuperAdmin->value, Role::Admin->value])) {
             return true;
@@ -26,6 +32,10 @@ class TaskAssignmentAuthorizer
             return true;
         }
 
-        return $this->hierarchy->isAncestorOf($actor, $target);
+        if (! $this->hierarchy->isAncestorOf($actor, $target)) {
+            return false;
+        }
+
+        return $departmentId === null || $target->department_id === $departmentId;
     }
 }

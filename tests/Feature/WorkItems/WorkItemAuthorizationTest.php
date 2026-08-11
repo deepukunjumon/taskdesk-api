@@ -156,6 +156,95 @@ it('only shows a user their own assigned work items in the index listing', funct
     expect($ids)->not->toContain($othersItem->id);
 });
 
+it('shows a manager a task in their own index listing after assigning it to a report', function () {
+    $department = Department::factory()->create();
+    $manager = User::factory()->create(['department_id' => $department->id]);
+    $manager->assignRole(Role::User->value);
+    $report = User::factory()->create(['department_id' => $department->id, 'manager_id' => $manager->id]);
+    $report->assignRole(Role::User->value);
+
+    $createResponse = $this->actingAs($manager)->postJson('/api/work-items', [
+        'department_id' => $department->id,
+        'entry_type' => 'task',
+        'assigned_to_id' => $report->id,
+        'source' => 'internal',
+        'priority' => 'low',
+        'subject' => 'Delegated to report',
+        'description' => 'Manager should still see this in their own list',
+    ]);
+    $createResponse->assertStatus(201);
+    $itemId = $createResponse->json('data.id');
+
+    $listResponse = $this->actingAs($manager)->getJson('/api/work-items');
+    $listResponse->assertOk();
+    expect(collect($listResponse->json('data'))->pluck('id'))->toContain($itemId);
+
+    $this->actingAs($manager)->getJson("/api/work-items/{$itemId}")->assertOk();
+
+    $statsResponse = $this->actingAs($manager)->getJson('/api/work-items/stats');
+    $statsResponse->assertOk()->assertJsonPath('data.total', 1);
+});
+
+it("shows a manager a report's self-assigned task in their own index listing, view, and stats", function () {
+    $department = Department::factory()->create();
+    $manager = User::factory()->create(['department_id' => $department->id]);
+    $manager->assignRole(Role::User->value);
+    $report = User::factory()->create(['department_id' => $department->id, 'manager_id' => $manager->id]);
+    $report->assignRole(Role::User->value);
+
+    // The report assigns the task to themself — assigned_by_id is the report's
+    // own id, never the manager's, so this can only be found via the reporting
+    // chain (assigned_to_id being a descendant of the manager).
+    $createResponse = $this->actingAs($report)->postJson('/api/work-items', [
+        'department_id' => $department->id,
+        'entry_type' => 'task',
+        'assigned_to_id' => $report->id,
+        'source' => 'internal',
+        'priority' => 'low',
+        'subject' => 'Self-assigned by report',
+        'description' => 'Manager should still see this even though they had no hand in it',
+    ]);
+    $createResponse->assertStatus(201);
+    $itemId = $createResponse->json('data.id');
+
+    $listResponse = $this->actingAs($manager)->getJson('/api/work-items');
+    $listResponse->assertOk();
+    expect(collect($listResponse->json('data'))->pluck('id'))->toContain($itemId);
+
+    $this->actingAs($manager)->getJson("/api/work-items/{$itemId}")->assertOk();
+
+    $statsResponse = $this->actingAs($manager)->getJson('/api/work-items/stats');
+    $statsResponse->assertOk()->assertJsonPath('data.total', 1);
+});
+
+it("excludes a self-assigned task from an unrelated manager's index listing", function () {
+    $department = Department::factory()->create();
+    $manager = User::factory()->create(['department_id' => $department->id]);
+    $manager->assignRole(Role::User->value);
+    $report = User::factory()->create(['department_id' => $department->id, 'manager_id' => $manager->id]);
+    $report->assignRole(Role::User->value);
+    $unrelatedManager = User::factory()->create(['department_id' => $department->id]);
+    $unrelatedManager->assignRole(Role::User->value);
+
+    $createResponse = $this->actingAs($report)->postJson('/api/work-items', [
+        'department_id' => $department->id,
+        'entry_type' => 'task',
+        'assigned_to_id' => $report->id,
+        'source' => 'internal',
+        'priority' => 'low',
+        'subject' => 'Self-assigned by report',
+        'description' => 'Should stay invisible to a manager outside the chain',
+    ]);
+    $createResponse->assertStatus(201);
+    $itemId = $createResponse->json('data.id');
+
+    $this->actingAs($unrelatedManager)->getJson("/api/work-items/{$itemId}")->assertStatus(403);
+
+    $listResponse = $this->actingAs($unrelatedManager)->getJson('/api/work-items');
+    $listResponse->assertOk();
+    expect(collect($listResponse->json('data'))->pluck('id'))->not->toContain($itemId);
+});
+
 it('allows a superadmin to view work items across all departments', function () {
     $deptA = Department::factory()->create();
     $deptB = Department::factory()->create();

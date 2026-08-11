@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreDepartmentRequest extends FormRequest
 {
@@ -18,7 +19,8 @@ class StoreDepartmentRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', 'unique:departments,code'],
+            // A soft-deleted department's code is free to reuse.
+            'code' => ['required', 'string', 'max:50', Rule::unique('departments', 'code')->whereNull('deleted_at')],
         ];
     }
 }

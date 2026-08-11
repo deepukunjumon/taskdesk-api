@@ -26,11 +26,15 @@ class UserController extends Controller
     /**
      * Backs the "Assign To" dropdown — the actor's own record plus everyone
      * they're allowed to assign a task to, so the frontend never re-derives
-     * hierarchy rules itself.
+     * hierarchy rules itself. An optional `department_id` narrows the list
+     * to that department, for when the caller has already picked which
+     * department the task is being filed under.
      */
     public function assignable(Request $request): JsonResponse
     {
-        return UserResource::collection($this->users->assignableFor($request->user()))->response();
+        $users = $this->users->assignableFor($request->user(), $request->query('department_id'));
+
+        return UserResource::collection($users)->response();
     }
 
     public function updateManager(UpdateUserManagerRequest $request, User $user): JsonResponse

@@ -38,17 +38,24 @@ class UserService
      * The actor's own record plus everyone assignable to them — every
      * descendant for a plain user, or every user for admin/superadmin.
      * Backs the "Assign To" dropdown so the frontend never has to know the
-     * hierarchy rules itself.
+     * hierarchy rules itself. An optional $departmentId narrows the result
+     * to that department, matching the department-scoped check in
+     * TaskAssignmentAuthorizer::canAssign() so the dropdown never offers a
+     * choice the backend would then reject.
      *
      * @return Collection<int, User>
      */
-    public function assignableFor(User $actor): Collection
+    public function assignableFor(User $actor, ?string $departmentId = null): Collection
     {
-        if ($actor->hasRole([Role::SuperAdmin->value, Role::Admin->value])) {
-            return collect($this->users->all()->all());
+        $candidates = $actor->hasRole([Role::SuperAdmin->value, Role::Admin->value])
+            ? collect($this->users->all()->all())
+            : $this->hierarchy->getDescendants($actor)->prepend($actor);
+
+        if ($departmentId === null) {
+            return $candidates;
         }
 
-        return $this->hierarchy->getDescendants($actor)->prepend($actor);
+        return $candidates->filter(fn (User $user) => $user->department_id === $departmentId)->values();
     }
 
     /**

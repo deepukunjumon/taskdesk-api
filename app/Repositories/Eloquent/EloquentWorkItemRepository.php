@@ -7,6 +7,7 @@ use App\Enums\WorkItemStatus;
 use App\Models\User;
 use App\Models\WorkItem;
 use App\Repositories\Contracts\WorkItemRepositoryInterface;
+use App\Services\HierarchyService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,10 @@ class EloquentWorkItemRepository implements WorkItemRepositoryInterface
     private const EAGER = ['department', 'branch', 'category', 'assignedTo', 'assignedBy', 'createdBy'];
 
     private const SORTABLE = ['created_at', 'priority', 'status', 'work_id'];
+
+    public function __construct(
+        private readonly HierarchyService $hierarchy,
+    ) {}
 
     public function findById(string $id): ?WorkItem
     {
@@ -93,7 +98,21 @@ class EloquentWorkItemRepository implements WorkItemRepositoryInterface
             return;
         }
 
-        $query->where('assigned_to_id', $actor->id);
+        // A plain user sees: items assigned to them, items they themself
+        // assigned to someone else (e.g. a manager delegating to a report),
+        // and items assigned to anyone in their reporting chain — including
+        // a report's own self-assigned task, which has no assigned_by tie
+        // to the manager at all.
+        $descendantIds = $this->hierarchy->getDescendants($actor)->pluck('id');
+
+        $query->where(function (Builder $q) use ($actor, $descendantIds) {
+            $q->where('assigned_to_id', $actor->id)
+                ->orWhere('assigned_by_id', $actor->id)
+                ->when(
+                    $descendantIds->isNotEmpty(),
+                    fn (Builder $q2) => $q2->orWhereIn('assigned_to_id', $descendantIds),
+                );
+        });
     }
 
     /**
