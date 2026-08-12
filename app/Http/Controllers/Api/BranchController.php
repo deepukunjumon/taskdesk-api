@@ -25,7 +25,7 @@ class BranchController extends Controller
                 fn ($q) => $q->where('is_active', true),
             )
             ->orderBy('name')
-            ->get();
+            ->paginate($request->query('per_page', 15));
 
         return BranchResource::collection($branches)->response();
     }

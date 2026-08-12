@@ -15,5 +15,6 @@ class DepartmentSeeder extends Seeder
         Department::firstOrCreate(['code' => 'HR'], ['name' => 'HR & Administration']);
         Department::firstOrCreate(['code' => 'ACC'], ['name' => 'Accounts']);
         Department::firstOrCreate(['code' => 'ADMIN'], ['name' => 'Administration']);
+        Department::firstOrCreate(['code' => 'DM'], ['name' => 'Digital Marketing']);
     }
 }

@@ -32,7 +32,7 @@ class DepartmentController extends Controller
                 fn ($q) => $q->where('is_active', true),
             )
             ->orderBy('name')
-            ->get();
+            ->paginate($request->query('per_page', 15));
 
         return DepartmentResource::collection($departments)->response();
     }

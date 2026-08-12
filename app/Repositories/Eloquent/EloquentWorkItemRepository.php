@@ -16,7 +16,7 @@ class EloquentWorkItemRepository implements WorkItemRepositoryInterface
 {
     private const EAGER = ['department', 'branch', 'category', 'assignedTo', 'assignedBy', 'createdBy'];
 
-    private const SORTABLE = ['created_at', 'priority', 'status', 'work_id'];
+    private const SORTABLE = ['created_at', 'priority', 'status', 'task_id'];
 
     public function __construct(
         private readonly HierarchyService $hierarchy,

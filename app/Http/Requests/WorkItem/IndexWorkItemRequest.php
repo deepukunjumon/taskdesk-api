@@ -30,7 +30,7 @@ class IndexWorkItemRequest extends FormRequest
             'category_id' => ['sometimes', 'uuid'],
             'date_from' => ['sometimes', 'date'],
             'date_to' => ['sometimes', 'date'],
-            'sort_by' => ['sometimes', 'in:created_at,priority,status,work_id'],
+            'sort_by' => ['sometimes', 'in:created_at,priority,status,task_id'],
             'sort_dir' => ['sometimes', 'in:asc,desc'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ];

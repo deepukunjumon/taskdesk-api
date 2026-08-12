@@ -20,7 +20,7 @@ class WorkItemResource extends JsonResource
 
         return [
             'id' => $this->id,
-            'work_id' => $this->work_id,
+            'task_id' => $this->task_id,
             'department' => new DepartmentResource($this->whenLoaded('department')),
             'entry_type' => $this->entry_type,
             'assigned_by' => $this->whenLoaded('assignedBy', fn () => $this->assignedBy ? [

@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('work_items', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('work_id')->unique();
+            $table->string('task_id')->unique();
             $table->foreignUuid('department_id')->constrained()->cascadeOnDelete();
             $table->string('entry_type');
             $table->string('assigned_by');

@@ -40,7 +40,7 @@ it('generates unique, strictly sequential, zero-padded task IDs across many rapi
             'description' => 'Test description',
         ], $admin);
 
-        return $item->work_id;
+        return $item->task_id;
     });
 
     expect($workIds->unique())->toHaveCount(15);

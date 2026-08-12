@@ -18,7 +18,7 @@ class WorkItem extends Model
     use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'work_id',
+        'task_id',
         'department_id',
         'entry_type',
         'assigned_by_id',

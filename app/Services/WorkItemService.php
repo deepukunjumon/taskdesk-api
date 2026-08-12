@@ -48,7 +48,7 @@ class WorkItemService
         return DB::transaction(function () use ($attributes, $actor) {
             $number = $this->items->nextWorkNumber();
 
-            $attributes['work_id'] = sprintf('W%04d', $number);
+            $attributes['task_id'] = sprintf('T%04d', $number);
             $attributes['created_by_id'] = $actor->id;
             $attributes['assigned_by_id'] = $actor->id;
             $attributes['status'] = WorkItemStatus::Open->value;

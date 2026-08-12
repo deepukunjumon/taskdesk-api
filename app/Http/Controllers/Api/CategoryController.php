@@ -20,9 +20,7 @@ class CategoryController extends Controller
     public function index(Request $request): JsonResponse
     {
         $categories = Category::query()
-            // A category with no department is a common one (e.g. "General")
-            // that applies regardless of which department is selected, so it
-            // must always be included alongside the department-specific match.
+            ->with('department')
             ->when(
                 $request->query('department_id'),
                 fn ($q, $id) => $q->where(fn ($q) => $q->where('department_id', $id)->orWhereNull('department_id')),
@@ -32,7 +30,7 @@ class CategoryController extends Controller
                 fn ($q) => $q->where('is_active', true),
             )
             ->orderBy('name')
-            ->get();
+            ->paginate($request->query('per_page', 15));
 
         return CategoryResource::collection($categories)->response();
     }

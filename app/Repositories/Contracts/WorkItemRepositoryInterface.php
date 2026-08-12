@@ -30,7 +30,7 @@ interface WorkItemRepositoryInterface
     public function paginate(User $actor, array $filters, int $perPage): LengthAwarePaginator;
 
     /**
-     * Atomically reserves and returns the next sequence number for work_id
+     * Atomically reserves and returns the next sequence number for task_id
      * generation (e.g. 1 -> "W0001"). Must be called inside a DB transaction.
      */
     public function nextWorkNumber(): int;

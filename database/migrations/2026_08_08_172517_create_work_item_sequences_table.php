@@ -8,7 +8,7 @@ return new class extends Migration
 {
     /**
      * Single-row counter table used by EloquentWorkItemRepository::nextWorkNumber()
-     * to generate collision-free sequential work_id values under row locking.
+     * to generate collision-free sequential task_id values under row locking.
      */
     public function up(): void
     {
