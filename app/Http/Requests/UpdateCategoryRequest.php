@@ -18,7 +18,9 @@ class UpdateCategoryRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'department_id' => ['sometimes', 'nullable', 'uuid', 'exists:departments,id'],
+            // An empty array means "common" — applies to every department.
+            'department_ids' => ['sometimes', 'array'],
+            'department_ids.*' => ['uuid', 'exists:departments,id'],
         ];
     }
 }

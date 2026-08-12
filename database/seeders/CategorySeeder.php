@@ -12,9 +12,13 @@ class CategorySeeder extends Seeder
     {
         $technical = Department::where('code', 'TECH')->first();
 
-        Category::firstOrCreate(['name' => 'Hardware', 'department_id' => $technical?->id]);
-        Category::firstOrCreate(['name' => 'Software', 'department_id' => $technical?->id]);
-        Category::firstOrCreate(['name' => 'Network', 'department_id' => $technical?->id]);
-        Category::firstOrCreate(['name' => 'General', 'department_id' => null]);
+        foreach (['Hardware', 'Software', 'Network'] as $name) {
+            $category = Category::firstOrCreate(['name' => $name]);
+            if ($technical) {
+                $category->departments()->syncWithoutDetaching([$technical->id]);
+            }
+        }
+
+        Category::firstOrCreate(['name' => 'General']);
     }
 }

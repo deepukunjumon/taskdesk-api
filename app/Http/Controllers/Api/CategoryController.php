@@ -20,10 +20,16 @@ class CategoryController extends Controller
     public function index(Request $request): JsonResponse
     {
         $categories = Category::query()
-            ->with('department')
+            ->with('departments')
+            // A category with no departments attached is a common one (e.g.
+            // "General") that applies regardless of which department is
+            // selected, so it must always be included alongside a specific match.
             ->when(
                 $request->query('department_id'),
-                fn ($q, $id) => $q->where(fn ($q) => $q->where('department_id', $id)->orWhereNull('department_id')),
+                fn ($q, $id) => $q->where(
+                    fn ($q) => $q->whereHas('departments', fn ($q) => $q->where('departments.id', $id))
+                        ->orWhereDoesntHave('departments'),
+                ),
             )
             ->when(
                 ! $request->boolean('include_inactive'),
@@ -39,18 +45,23 @@ class CategoryController extends Controller
     {
         abort_unless($request->user()->hasRole([Role::SuperAdmin->value, Role::Admin->value]), 403);
 
-        $category = Category::create($request->validated());
+        $category = Category::create($request->safe()->only('name'));
+        $category->departments()->sync($request->validated('department_ids', []));
 
-        return (new CategoryResource($category))->response()->setStatusCode(201);
+        return (new CategoryResource($category->load('departments')))->response()->setStatusCode(201);
     }
 
     public function update(UpdateCategoryRequest $request, Category $category): JsonResponse
     {
         abort_unless($request->user()->hasRole([Role::SuperAdmin->value, Role::Admin->value]), 403);
 
-        $category->update($request->validated());
+        $category->update($request->safe()->only('name'));
 
-        return (new CategoryResource($category))->response();
+        if ($request->has('department_ids')) {
+            $category->departments()->sync($request->validated('department_ids'));
+        }
+
+        return (new CategoryResource($category->load('departments')))->response();
     }
 
     public function toggleActive(Request $request, Category $category): JsonResponse

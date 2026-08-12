@@ -20,8 +20,20 @@ class CategoryFactory extends Factory
     {
         return [
             'name' => fake()->unique()->word(),
-            'department_id' => Department::factory(),
             'is_active' => true,
         ];
+    }
+
+    /**
+     * Attaches the category to the given department(s) after creation — a
+     * category with none attached is "common" and applies everywhere, so
+     * tests opt into a specific scope explicitly via this state.
+     */
+    public function forDepartments(Department|string ...$departments): static
+    {
+        return $this->afterCreating(function (Category $category) use ($departments) {
+            $ids = collect($departments)->map(fn ($department) => $department instanceof Department ? $department->id : $department);
+            $category->departments()->sync($ids);
+        });
     }
 }

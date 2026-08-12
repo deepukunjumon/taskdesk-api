@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Category extends Model
@@ -14,7 +14,6 @@ class Category extends Model
 
     protected $fillable = [
         'name',
-        'department_id',
         'is_active',
     ];
 
@@ -25,8 +24,13 @@ class Category extends Model
         ];
     }
 
-    public function department(): BelongsTo
+    /**
+     * A category attached to zero departments is a common one (e.g.
+     * "General") that applies regardless of which department is selected —
+     * see CategoryController::index() for the matching query-side rule.
+     */
+    public function departments(): BelongsToMany
     {
-        return $this->belongsTo(Department::class);
+        return $this->belongsToMany(Department::class, 'category_department');
     }
 }

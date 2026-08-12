@@ -25,12 +25,48 @@ it('allows an admin to update a category', function () {
 
     $response = $this->actingAs($admin)->patchJson("/api/categories/{$category->id}", [
         'name' => 'New Category',
-        'department_id' => $department->id,
+        'department_ids' => [$department->id],
     ]);
 
     $response->assertOk()
         ->assertJsonPath('data.name', 'New Category')
-        ->assertJsonPath('data.department_id', $department->id);
+        ->assertJsonPath('data.department_ids', [$department->id]);
+});
+
+it('allows a category to be attached to multiple departments at once', function () {
+    $admin = categoryMasterTestAdmin();
+    $departmentA = Department::factory()->create();
+    $departmentB = Department::factory()->create();
+    $category = Category::factory()->create();
+
+    $response = $this->actingAs($admin)->patchJson("/api/categories/{$category->id}", [
+        'department_ids' => [$departmentA->id, $departmentB->id],
+    ]);
+
+    $response->assertOk();
+    $ids = collect($response->json('data.department_ids'));
+    expect($ids)->toHaveCount(2)->toContain($departmentA->id)->toContain($departmentB->id);
+
+    $refetched = $this->actingAs($admin)->getJson("/api/categories?include_inactive=1&department_id={$departmentA->id}");
+    expect(collect($refetched->json('data'))->pluck('id'))->toContain($category->id);
+
+    $refetchedB = $this->actingAs($admin)->getJson("/api/categories?include_inactive=1&department_id={$departmentB->id}");
+    expect(collect($refetchedB->json('data'))->pluck('id'))->toContain($category->id);
+});
+
+it('creates a category attached to multiple departments', function () {
+    $admin = categoryMasterTestAdmin();
+    $departmentA = Department::factory()->create();
+    $departmentB = Department::factory()->create();
+
+    $response = $this->actingAs($admin)->postJson('/api/categories', [
+        'name' => 'Multi-dept Category',
+        'department_ids' => [$departmentA->id, $departmentB->id],
+    ]);
+
+    $response->assertCreated();
+    $ids = collect($response->json('data.department_ids'));
+    expect($ids)->toHaveCount(2)->toContain($departmentA->id)->toContain($departmentB->id);
 });
 
 it('rejects a non-admin updating a category', function () {
@@ -99,9 +135,9 @@ it('includes department-less categories when filtering by a specific department'
     $departmentA = Department::factory()->create();
     $departmentB = Department::factory()->create();
 
-    $general = Category::factory()->create(['name' => 'General', 'department_id' => null]);
-    $scopedToA = Category::factory()->create(['name' => 'Hardware', 'department_id' => $departmentA->id]);
-    $scopedToB = Category::factory()->create(['name' => 'Software', 'department_id' => $departmentB->id]);
+    $general = Category::factory()->create(['name' => 'General']);
+    $scopedToA = Category::factory()->forDepartments($departmentA)->create(['name' => 'Hardware']);
+    $scopedToB = Category::factory()->forDepartments($departmentB)->create(['name' => 'Software']);
 
     $response = $this->actingAs($admin)->getJson("/api/categories?department_id={$departmentA->id}");
     $ids = collect($response->json('data'))->pluck('id');
