@@ -19,6 +19,7 @@ class WorkItemTimeline extends Model
         'action',
         'from_status',
         'to_status',
+        'assigned_to_name',
         'note',
     ];
 

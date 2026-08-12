@@ -22,6 +22,7 @@ class WorkItemTimelineResource extends JsonResource
             'action' => $this->action,
             'from_status' => $this->from_status,
             'to_status' => $this->to_status,
+            'assigned_to_name' => $this->assigned_to_name,
             'note' => $this->note,
             'created_at' => $this->created_at,
         ];

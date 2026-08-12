@@ -103,18 +103,23 @@ class WorkItemService
     {
         return DB::transaction(function () use ($item, $newAssigneeId, $note, $actor) {
             $previousAssigneeId = $item->assigned_to_id;
+            $previousAssigneeName = $previousAssigneeId
+                ? User::find($previousAssigneeId)?->name ?? $previousAssigneeId
+                : 'Unassigned';
+            $newAssigneeName = User::find($newAssigneeId)?->name ?? $newAssigneeId;
+
             $item->assigned_to_id = $newAssigneeId;
             $item->assigned_by_id = $actor->id;
             $item->save();
 
             $historyNote = trim(sprintf(
                 'Reassigned from %s to %s.%s',
-                $previousAssigneeId,
-                $newAssigneeId,
+                $previousAssigneeName,
+                $newAssigneeName,
                 $note ? " {$note}" : '',
             ));
 
-            $this->recordTimeline($item, $actor, 'reassigned', null, null, $historyNote);
+            $this->recordTimeline($item, $actor, 'reassigned', null, null, $historyNote, $newAssigneeName);
 
             return $this->find($item->id);
         });
@@ -152,12 +157,14 @@ class WorkItemService
         ?string $fromStatus,
         ?string $toStatus,
         ?string $note,
+        ?string $assignedToName = null,
     ): void {
         $item->timelines()->create([
             'actor_id' => $actor->id,
             'action' => $action,
             'from_status' => $fromStatus,
             'to_status' => $toStatus,
+            'assigned_to_name' => $assignedToName,
             'note' => $note,
         ]);
     }

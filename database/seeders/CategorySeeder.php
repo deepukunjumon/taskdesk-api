@@ -10,11 +10,11 @@ class CategorySeeder extends Seeder
 {
     public function run(): void
     {
-        $itSupport = Department::where('code', 'ITS')->first();
+        $technical = Department::where('code', 'TECH')->first();
 
-        Category::firstOrCreate(['name' => 'Hardware', 'department_id' => $itSupport?->id]);
-        Category::firstOrCreate(['name' => 'Software', 'department_id' => $itSupport?->id]);
-        Category::firstOrCreate(['name' => 'Network', 'department_id' => $itSupport?->id]);
+        Category::firstOrCreate(['name' => 'Hardware', 'department_id' => $technical?->id]);
+        Category::firstOrCreate(['name' => 'Software', 'department_id' => $technical?->id]);
+        Category::firstOrCreate(['name' => 'Network', 'department_id' => $technical?->id]);
         Category::firstOrCreate(['name' => 'General', 'department_id' => null]);
     }
 }
