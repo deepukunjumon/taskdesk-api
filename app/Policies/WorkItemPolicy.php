@@ -40,11 +40,6 @@ class WorkItemPolicy
         'remarks',
     ];
 
-    /**
-     * @var list<string>
-     */
-    private const USER_EDIT_FIELDS = ['resolution', 'remarks'];
-
     public function __construct(
         private readonly TaskAssignmentAuthorizer $assignmentAuthorizer,
         private readonly HierarchyService $hierarchy,
@@ -105,19 +100,22 @@ class WorkItemPolicy
     }
 
     /**
+     * Editing is admin/superadmin-only — a plain user, whether they're the
+     * assignee, the one who assigned it, or an ancestor in the reporting
+     * chain, has no field-level edit access here. An assignee works the
+     * task purely through the Update Status control (which is where
+     * resolution belongs, captured on the transition to Closed); there is
+     * nothing else for them, or their manager, to edit on this endpoint.
+     *
      * @return list<string>
      */
     public function editableFields(User $user, WorkItem $item): array
     {
-        if (! $this->isEditable($item) || ! $this->isInScope($user, $item)) {
+        if (! $this->isEditable($item) || ! $this->canManage($user)) {
             return [];
         }
 
-        if ($this->canManage($user)) {
-            return self::FULL_EDIT_FIELDS;
-        }
-
-        return self::USER_EDIT_FIELDS;
+        return self::FULL_EDIT_FIELDS;
     }
 
     private function isEditable(WorkItem $item): bool

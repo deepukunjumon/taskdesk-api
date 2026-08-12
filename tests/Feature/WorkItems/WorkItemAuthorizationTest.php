@@ -46,6 +46,78 @@ it("prevents a user from updating another user's work item", function () {
     $response->assertStatus(403);
 });
 
+it('gives a plain assignee no editable fields — remarks and resolution are both admin/superadmin-only', function () {
+    $department = Department::factory()->create();
+    $owner = User::factory()->create(['department_id' => $department->id]);
+    $owner->assignRole(Role::User->value);
+
+    $item = WorkItem::factory()->create([
+        'department_id' => $department->id,
+        'created_by_id' => $owner->id,
+        'assigned_to_id' => $owner->id,
+        'status' => 'in_progress',
+    ]);
+
+    $remarksResponse = $this->actingAs($owner)->patchJson("/api/work-items/{$item->id}", [
+        'remarks' => 'Trying to leave a note without going through status update.',
+    ]);
+    $remarksResponse->assertOk();
+
+    $resolutionResponse = $this->actingAs($owner)->patchJson("/api/work-items/{$item->id}", [
+        'resolution' => 'Fixed it already, even though the task is still open.',
+    ]);
+    $resolutionResponse->assertOk();
+
+    $fresh = $item->fresh();
+    expect($fresh->remarks)->toBeNull();
+    expect($fresh->resolution)->toBeNull();
+});
+
+it("lets a manager edit their report's task even though the manager isn't the assignee", function () {
+    $department = Department::factory()->create();
+    $manager = User::factory()->create(['department_id' => $department->id]);
+    $manager->assignRole(Role::User->value);
+    $report = User::factory()->create(['department_id' => $department->id, 'manager_id' => $manager->id]);
+    $report->assignRole(Role::User->value);
+
+    $item = WorkItem::factory()->create([
+        'department_id' => $department->id,
+        'created_by_id' => $manager->id,
+        'assigned_to_id' => $report->id,
+        'assigned_by_id' => $manager->id,
+    ]);
+
+    $response = $this->actingAs($manager)->patchJson("/api/work-items/{$item->id}", [
+        'remarks' => 'Following up with the report.',
+    ]);
+    $response->assertOk();
+    expect($item->fresh()->remarks)->toBeNull();
+});
+
+it('allows an admin to edit every field, including resolution and remarks, on any task', function () {
+    $department = Department::factory()->create();
+    $admin = User::factory()->create();
+    $admin->assignRole(Role::Admin->value);
+    $employee = User::factory()->create(['department_id' => $department->id]);
+    $employee->assignRole(Role::User->value);
+
+    $item = WorkItem::factory()->create([
+        'department_id' => $department->id,
+        'created_by_id' => $employee->id,
+        'assigned_to_id' => $employee->id,
+        'status' => 'in_progress',
+    ]);
+
+    $response = $this->actingAs($admin)->patchJson("/api/work-items/{$item->id}", [
+        'remarks' => 'Admin note.',
+        'resolution' => 'Admin-set resolution.',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('data.remarks', 'Admin note.')
+        ->assertJsonPath('data.resolution', 'Admin-set resolution.');
+});
+
 it('prevents an unrelated user from reassigning a work item', function () {
     $department = Department::factory()->create();
     $user = User::factory()->create(['department_id' => $department->id]);
