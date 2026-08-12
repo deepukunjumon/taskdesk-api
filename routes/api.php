@@ -45,6 +45,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/work-items/{workItem}', [WorkItemController::class, 'destroy']);
 
     Route::get('/departments', [DepartmentController::class, 'index']);
+    Route::get('/departments/options', [DepartmentController::class, 'options']);
     Route::post('/departments', [DepartmentController::class, 'store']);
     Route::patch('/departments/{department}', [DepartmentController::class, 'update']);
     Route::patch('/departments/{department}/toggle-active', [DepartmentController::class, 'toggleActive']);

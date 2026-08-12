@@ -309,3 +309,61 @@ it('narrows the assignable-users endpoint to the given department', function () 
     expect($ids)->toContain($reportSameDept->id)
         ->not->toContain($reportOtherDept->id);
 });
+
+it('returns only the minimal id/name/department_id shape from the assignable-users endpoint', function () {
+    $manager = User::factory()->create();
+    $manager->assignRole(Role::User->value);
+    $report = User::factory()->create(['manager_id' => $manager->id]);
+    $report->assignRole(Role::User->value);
+
+    $response = $this->actingAs($manager)->getJson('/api/users/me/assignable');
+
+    $response->assertOk();
+    $entry = collect($response->json('data'))->firstWhere('id', $report->id);
+
+    expect(array_keys($entry))->toBe(['id', 'name', 'department_id']);
+});
+
+it('filters the assignable-users endpoint by a name search', function () {
+    $manager = User::factory()->create();
+    $manager->assignRole(Role::User->value);
+    $ajith = User::factory()->create(['name' => 'Ajith Balachandran', 'manager_id' => $manager->id]);
+    $ajith->assignRole(Role::User->value);
+    $midhun = User::factory()->create(['name' => 'Midhun E B', 'manager_id' => $manager->id]);
+    $midhun->assignRole(Role::User->value);
+
+    $response = $this->actingAs($manager)->getJson('/api/users/me/assignable?q=ajith');
+
+    $response->assertOk();
+    $ids = collect($response->json('data'))->pluck('id');
+
+    expect($ids)->toContain($ajith->id)->not->toContain($midhun->id);
+});
+
+it('combines department and search filters on the assignable-users endpoint', function () {
+    $technical = Department::factory()->create();
+    $software = Department::factory()->create();
+
+    $manager = User::factory()->create(['department_id' => $technical->id]);
+    $manager->assignRole(Role::User->value);
+    $ajithInTech = User::factory()->create([
+        'name' => 'Ajith Balachandran',
+        'department_id' => $technical->id,
+        'manager_id' => $manager->id,
+    ]);
+    $ajithInTech->assignRole(Role::User->value);
+    $ajithInSoftware = User::factory()->create([
+        'name' => 'Ajith Kumar',
+        'department_id' => $software->id,
+        'manager_id' => $manager->id,
+    ]);
+    $ajithInSoftware->assignRole(Role::User->value);
+
+    $response = $this->actingAs($manager)
+        ->getJson("/api/users/me/assignable?department_id={$technical->id}&q=ajith");
+
+    $response->assertOk();
+    $ids = collect($response->json('data'))->pluck('id');
+
+    expect($ids)->toContain($ajithInTech->id)->not->toContain($ajithInSoftware->id);
+});

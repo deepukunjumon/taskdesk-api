@@ -106,3 +106,29 @@ it('lets a new department reuse the code of a soft-deleted one', function () {
 
     $response->assertStatus(201)->assertJsonPath('data.code', 'REUSE');
 });
+
+it('returns only id and name from the minimal options endpoint, active departments only', function () {
+    $user = User::factory()->create();
+    $active = Department::factory()->create(['name' => 'Technical', 'is_active' => true]);
+    $inactive = Department::factory()->create(['name' => 'Retired Dept', 'is_active' => false]);
+
+    $response = $this->actingAs($user)->getJson('/api/departments/options');
+
+    $response->assertOk();
+    $data = collect($response->json('data'));
+
+    expect($data->pluck('id'))->toContain($active->id)->not->toContain($inactive->id);
+    expect(array_keys($data->first()))->toBe(['id', 'name']);
+});
+
+it('filters the options endpoint by a name search', function () {
+    $user = User::factory()->create();
+    $technical = Department::factory()->create(['name' => 'Technical', 'is_active' => true]);
+    $software = Department::factory()->create(['name' => 'Software Development', 'is_active' => true]);
+
+    $response = $this->actingAs($user)->getJson('/api/departments/options?q=Tech');
+
+    $response->assertOk();
+    $ids = collect($response->json('data'))->pluck('id');
+    expect($ids)->toContain($technical->id)->not->toContain($software->id);
+});

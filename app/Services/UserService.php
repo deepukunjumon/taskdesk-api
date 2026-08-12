@@ -41,21 +41,29 @@ class UserService
      * hierarchy rules itself. An optional $departmentId narrows the result
      * to that department, matching the department-scoped check in
      * TaskAssignmentAuthorizer::canAssign() so the dropdown never offers a
-     * choice the backend would then reject.
+     * choice the backend would then reject. An optional $search narrows it
+     * further to names containing the term, for a search-as-you-type
+     * dropdown/combobox.
      *
      * @return Collection<int, User>
      */
-    public function assignableFor(User $actor, ?string $departmentId = null): Collection
+    public function assignableFor(User $actor, ?string $departmentId = null, ?string $search = null): Collection
     {
         $candidates = $actor->hasRole([Role::SuperAdmin->value, Role::Admin->value])
             ? collect($this->users->all()->all())
             : $this->hierarchy->getDescendants($actor)->prepend($actor);
 
-        if ($departmentId === null) {
-            return $candidates;
+        if ($departmentId !== null) {
+            $candidates = $candidates->filter(fn (User $user) => $user->department_id === $departmentId);
         }
 
-        return $candidates->filter(fn (User $user) => $user->department_id === $departmentId)->values();
+        if ($search !== null && $search !== '') {
+            $candidates = $candidates->filter(
+                fn (User $user) => str_contains(strtolower($user->name), strtolower($search)),
+            );
+        }
+
+        return $candidates->values();
     }
 
     /**

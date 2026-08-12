@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreDepartmentRequest;
 use App\Http\Requests\UpdateDepartmentRequest;
+use App\Http\Resources\DepartmentOptionResource;
 use App\Http\Resources\DepartmentResource;
 use App\Models\Department;
 use Illuminate\Http\JsonResponse;
@@ -35,6 +36,27 @@ class DepartmentController extends Controller
             ->paginate($request->query('per_page', 15));
 
         return DepartmentResource::collection($departments)->response();
+    }
+
+    /**
+     * Minimal, active-only lookup for dropdowns/comboboxes — id + name only,
+     * optionally narrowed by `?q=` (name search). Deliberately separate from
+     * index() so form/dropdown callers never pull code/is_active/pagination
+     * metadata they don't need.
+     */
+    public function options(Request $request): JsonResponse
+    {
+        $departments = Department::query()
+            ->where('is_active', true)
+            ->when(
+                $request->query('q'),
+                fn ($q, $search) => $q->where('name', 'like', '%'.$search.'%'),
+            )
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name']);
+
+        return DepartmentOptionResource::collection($departments)->response();
     }
 
     public function store(StoreDepartmentRequest $request): JsonResponse
