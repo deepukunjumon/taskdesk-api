@@ -3,7 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\IndexUserRequest;
+use App\Http\Requests\RelieveUserRequest;
 use App\Http\Requests\UpdateUserManagerRequest;
+use App\Http\Requests\UpdateUserRequest;
+use App\Http\Requests\UpdateUserStatusRequest;
 use App\Http\Resources\UserOptionResource;
 use App\Http\Resources\UserResource;
 use App\Models\User;
@@ -17,11 +21,45 @@ class UserController extends Controller
         private readonly UserService $users,
     ) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(IndexUserRequest $request): JsonResponse
     {
         $this->authorize('viewAny', User::class);
 
-        return UserResource::collection($this->users->all())->response();
+        $filters = $request->validated();
+        if (array_key_exists('is_active', $filters)) {
+            $filters['is_active'] = $request->boolean('is_active');
+        }
+
+        $perPage = (int) ($filters['per_page'] ?? 15);
+
+        return UserResource::collection($this->users->list($filters, $perPage))->response();
+    }
+
+    public function update(UpdateUserRequest $request, User $user): JsonResponse
+    {
+        $this->authorize('update', User::class);
+
+        $updated = $this->users->update($user, $request->validated());
+
+        return (new UserResource($updated))->response();
+    }
+
+    public function updateStatus(UpdateUserStatusRequest $request, User $user): JsonResponse
+    {
+        $this->authorize('updateStatus', User::class);
+
+        $updated = $this->users->updateStatus($user, $request->boolean('is_active'));
+
+        return (new UserResource($updated))->response();
+    }
+
+    public function relieve(RelieveUserRequest $request, User $user): JsonResponse
+    {
+        $this->authorize('relieve', User::class);
+
+        $updated = $this->users->relieve($user, $request->validated('relieved_on'));
+
+        return (new UserResource($updated))->response();
     }
 
     /**

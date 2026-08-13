@@ -28,6 +28,10 @@ return new class extends Migration
             $table->string('password');
             $table->foreignUuid('department_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignUuid('manager_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('employee_code')->nullable()->unique();
+            $table->string('mobile')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->date('relieved_on')->nullable();
             $table->rememberToken();
             $table->timestamps();
             $table->softDeletes();

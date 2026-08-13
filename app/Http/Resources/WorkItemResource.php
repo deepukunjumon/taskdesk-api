@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\WorkItemStatus;
 use App\Policies\WorkItemPolicy;
 use App\Services\WorkItemStatusTransitioner;
 use Illuminate\Http\Request;

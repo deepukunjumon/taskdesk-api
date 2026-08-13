@@ -28,6 +28,10 @@ class User extends Authenticatable
         'password',
         'department_id',
         'manager_id',
+        'employee_code',
+        'mobile',
+        'is_active',
+        'relieved_on',
     ];
 
     /**
@@ -50,6 +54,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
+            'relieved_on' => 'date',
         ];
     }
 

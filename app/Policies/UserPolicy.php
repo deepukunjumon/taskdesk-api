@@ -21,4 +21,19 @@ class UserPolicy
     {
         return $user->hasRole([Role::SuperAdmin->value, Role::Admin->value]);
     }
+
+    public function update(User $user): bool
+    {
+        return $user->hasRole([Role::SuperAdmin->value, Role::Admin->value]);
+    }
+
+    public function updateStatus(User $user): bool
+    {
+        return $user->hasRole([Role::SuperAdmin->value, Role::Admin->value]);
+    }
+
+    public function relieve(User $user): bool
+    {
+        return $user->hasRole([Role::SuperAdmin->value, Role::Admin->value]);
+    }
 }

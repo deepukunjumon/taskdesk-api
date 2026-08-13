@@ -33,9 +33,26 @@ class UserResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
+            'employee_code' => $this->employee_code,
+            'mobile' => $this->mobile,
             'department_id' => $this->department_id,
             'manager_id' => $this->manager_id,
+            'department' => $this->whenLoaded('department', fn () => $this->department ? [
+                'id' => $this->department->id,
+                'name' => $this->department->name,
+            ] : null),
+            'manager' => $this->whenLoaded('manager', fn () => $this->manager ? [
+                'id' => $this->manager->id,
+                'name' => $this->manager->name,
+            ] : null),
             'roles' => $this->getRoleNames(),
+            'is_active' => $this->is_active,
+            'relieved_on' => $this->relieved_on,
+            // Direct reports only — how many other users currently have this
+            // one as manager_id. Only present when eager-loaded via
+            // withCount('reports') (the admin list, and after status/relieve
+            // mutations) — null on /me and /login, which never load it.
+            'reports_count' => $this->reports_count,
             'created_at' => $this->created_at,
 
             // Only meaningful — and only included — when this resource represents

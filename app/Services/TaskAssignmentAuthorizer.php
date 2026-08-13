@@ -24,6 +24,12 @@ class TaskAssignmentAuthorizer
      */
     public function canAssign(User $actor, User $target, ?string $departmentId = null): bool
     {
+        // A relieved/disabled user is never a valid assignment target,
+        // regardless of the actor's role.
+        if (! $target->is_active) {
+            return false;
+        }
+
         if ($actor->hasRole([Role::SuperAdmin->value, Role::Admin->value])) {
             return true;
         }
