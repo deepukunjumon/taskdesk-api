@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'pepipost' => [
+        'url' => env('PEPIPOST_API_URL'),
+        'key' => env('PEPIPOST_API_KEY'),
+    ],
+
+    'frontend' => [
+        'url' => env('FRONTEND_URL', 'http://localhost:5173'),
+    ],
+
 ];
