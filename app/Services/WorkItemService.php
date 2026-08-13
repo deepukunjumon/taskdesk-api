@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\MailerInterface;
 use App\Enums\WorkItemStatus;
 use App\Models\SlaSetting;
 use App\Models\User;
@@ -17,6 +18,7 @@ class WorkItemService
     public function __construct(
         private readonly WorkItemRepositoryInterface $items,
         private readonly WorkItemStatusTransitioner $transitioner,
+        private readonly MailerInterface $mailer,
     ) {}
 
     /**
@@ -45,7 +47,7 @@ class WorkItemService
      */
     public function create(array $attributes, User $actor): WorkItem
     {
-        return DB::transaction(function () use ($attributes, $actor) {
+        $item = DB::transaction(function () use ($attributes, $actor) {
             $number = $this->items->nextWorkNumber();
 
             $attributes['task_id'] = sprintf('T%04d', $number);
@@ -60,6 +62,10 @@ class WorkItemService
 
             return $this->find($item->id);
         });
+
+        $this->notifyAssignmentIfNeeded($item, $actor);
+
+        return $item;
     }
 
     /**
@@ -83,7 +89,7 @@ class WorkItemService
         ?string $note,
         User $actor,
     ): WorkItem {
-        return DB::transaction(function () use ($item, $to, $resolution, $note, $actor) {
+        $updated = DB::transaction(function () use ($item, $to, $resolution, $note, $actor) {
             $from = $item->status;
 
             if ($resolution !== null) {
@@ -97,11 +103,17 @@ class WorkItemService
 
             return $this->find($item->id);
         });
+
+        if ($to === WorkItemStatus::Closed) {
+            $this->notifyCompletionIfNeeded($updated, $actor);
+        }
+
+        return $updated;
     }
 
     public function reassign(WorkItem $item, string $newAssigneeId, ?string $note, User $actor): WorkItem
     {
-        return DB::transaction(function () use ($item, $newAssigneeId, $note, $actor) {
+        $updated = DB::transaction(function () use ($item, $newAssigneeId, $note, $actor) {
             $previousAssigneeId = $item->assigned_to_id;
             $previousAssigneeName = $previousAssigneeId
                 ? User::find($previousAssigneeId)?->name ?? $previousAssigneeId
@@ -123,6 +135,10 @@ class WorkItemService
 
             return $this->find($item->id);
         });
+
+        $this->notifyAssignmentIfNeeded($updated, $actor);
+
+        return $updated;
     }
 
     /**
@@ -148,6 +164,71 @@ class WorkItemService
         $hours = SlaSetting::where('priority', $priority)->value('hours');
 
         return $hours ? now()->addHours($hours) : null;
+    }
+
+    /**
+     * Sends an email to the assignee if the actor is not the assignee.
+     * 
+     * @param WorkItem $item
+     * @param User $actor
+     * 
+     * @return bool
+     */
+    private function notifyAssignmentIfNeeded(WorkItem $item, User $actor): bool
+    {
+        if ($item->assigned_to_id === $actor->id || ! $item->assignedTo) {
+            return false;
+        }
+
+        $this->sendWorkItemEmail(
+            $item,
+            'emails.task-assigned',
+            [
+                'assignedTo' => $item->assignedTo->name,
+                'assignedBy' => $actor
+            ],
+            "Task Assigned: {$item->task_id} — {$item->subject}",
+        );
+
+        return true;
+    }
+
+    /**
+     * Sends an email to the assignee if the actor is not the assignee and the item is completed.
+     * 
+     * @param WorkItem $item
+     * @param User $actor
+     * 
+     * @return bool
+     */
+    private function notifyCompletionIfNeeded(WorkItem $item, User $actor): bool
+    {
+        if ($item->assigned_to_id === $actor->id || ! $item->assignedTo) {
+            return false;
+        }
+
+        $this->sendWorkItemEmail(
+            $item,
+            'emails.task-completed',
+            ['completedBy' => $actor],
+            "Task Completed: {$item->task_id} — {$item->subject}",
+        );
+
+        return true;
+    }
+
+    /**
+     * Sends an email to the assignee with the given view and data.
+     * 
+     * @param  array<string, mixed>  $data
+     */
+    private function sendWorkItemEmail(WorkItem $item, string $view, array $data, string $subject): void
+    {
+        $taskUrl = rtrim(config('services.frontend.url'), '/').'/work-register';
+
+        $htmlBody = view($view, [...$data, 'workItem' => $item, 'taskUrl' => $taskUrl])->render();
+
+        $this->mailer->send($item->assignedTo->email, $subject, $htmlBody);
     }
 
     private function recordTimeline(
