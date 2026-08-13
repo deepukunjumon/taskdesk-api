@@ -121,11 +121,11 @@ class EloquentWorkItemRepository implements WorkItemRepositoryInterface
     private function applyFilters(Builder $query, array $filters): void
     {
         $query
-            ->when($filters['status'] ?? null, fn (Builder $q, $v) => $q->where('status', $v))
-            ->when($filters['priority'] ?? null, fn (Builder $q, $v) => $q->where('priority', $v))
-            ->when($filters['department_id'] ?? null, fn (Builder $q, $v) => $q->where('department_id', $v))
-            ->when($filters['assigned_to_id'] ?? null, fn (Builder $q, $v) => $q->where('assigned_to_id', $v))
-            ->when($filters['entry_type'] ?? null, fn (Builder $q, $v) => $q->where('entry_type', $v))
+            ->when(! empty($filters['status']), fn (Builder $q) => $q->whereIn('status', $filters['status']))
+            ->when(! empty($filters['priority']), fn (Builder $q) => $q->whereIn('priority', $filters['priority']))
+            ->when(! empty($filters['department_id']), fn (Builder $q) => $q->whereIn('department_id', $filters['department_id']))
+            ->when(! empty($filters['assigned_to_id']), fn (Builder $q) => $q->whereIn('assigned_to_id', $filters['assigned_to_id']))
+            ->when(! empty($filters['entry_type']), fn (Builder $q) => $q->whereIn('entry_type', $filters['entry_type']))
             ->when($filters['branch_id'] ?? null, fn (Builder $q, $v) => $q->where('branch_id', $v))
             ->when($filters['category_id'] ?? null, fn (Builder $q, $v) => $q->where('category_id', $v))
             ->when($filters['date_from'] ?? null, fn (Builder $q, $v) => $q->whereDate('created_at', '>=', $v))

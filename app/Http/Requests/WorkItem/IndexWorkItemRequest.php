@@ -10,9 +10,30 @@ use Illuminate\Validation\Rule;
 
 class IndexWorkItemRequest extends FormRequest
 {
+    /**
+     * Fields that can have multiple values
+     * @var list<string>
+     */
+    private const MULTI_VALUE_FIELDS = ['status', 'priority', 'entry_type', 'department_id', 'assigned_to_id'];
+
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $split = [];
+
+        foreach (self::MULTI_VALUE_FIELDS as $field) {
+            $value = $this->query($field);
+
+            if (is_string($value) && $value !== '') {
+                $split[$field] = array_values(array_filter(explode(',', $value), fn ($v) => $v !== ''));
+            }
+        }
+
+        $this->merge($split);
     }
 
     /**
@@ -21,11 +42,16 @@ class IndexWorkItemRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status' => ['sometimes', Rule::enum(WorkItemStatus::class)],
-            'priority' => ['sometimes', Rule::enum(Priority::class)],
-            'department_id' => ['sometimes', 'uuid'],
-            'assigned_to_id' => ['sometimes', 'uuid'],
-            'entry_type' => ['sometimes', Rule::enum(EntryType::class)],
+            'status' => ['sometimes', 'array'],
+            'status.*' => [Rule::enum(WorkItemStatus::class)],
+            'priority' => ['sometimes', 'array'],
+            'priority.*' => [Rule::enum(Priority::class)],
+            'department_id' => ['sometimes', 'array'],
+            'department_id.*' => ['uuid'],
+            'assigned_to_id' => ['sometimes', 'array'],
+            'assigned_to_id.*' => ['uuid'],
+            'entry_type' => ['sometimes', 'array'],
+            'entry_type.*' => [Rule::enum(EntryType::class)],
             'branch_id' => ['sometimes', 'uuid'],
             'category_id' => ['sometimes', 'uuid'],
             'date_from' => ['sometimes', 'date'],
