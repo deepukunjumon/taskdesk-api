@@ -46,6 +46,22 @@ class UserService
     /**
      * @param  array<string, mixed>  $attributes
      */
+    public function create(array $attributes): User
+    {
+        $role = $attributes['role'];
+        unset($attributes['role']);
+
+        // `password` is cast `hashed` on the model, so the plain value here
+        // is hashed automatically on save — no manual Hash::make() needed.
+        $target = $this->users->create($attributes);
+        $target->assignRole($role);
+
+        return $target->fresh(['department', 'manager'])->loadCount('reports');
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
     public function update(User $target, array $attributes): User
     {
         $target->update($attributes);
