@@ -29,7 +29,11 @@ class PasswordResetService
 
     /**
      * Request a password reset OTP for the given email.
-     * If the email does not match any account, logs the attempt but does not reveal this to the caller.
+     * 
+     * @param string $email
+     * @param string|null $ip
+     *
+     * @throws ValidationException
      */
     public function requestOtp(string $email, ?string $ip = null): void
     {
@@ -42,7 +46,9 @@ class PasswordResetService
                 'timestamp' => now()->toIso8601String(),
             ]);
 
-            return;
+            throw ValidationException::withMessages([
+                'email' => ['No account found with this email address.'],
+            ]);
         }
 
         // Only one active OTP per email at a time.
@@ -57,12 +63,6 @@ class PasswordResetService
             'otp_hash' => $this->otpHasher->hash($otp),
             'expires_at' => now()->addMinutes(self::OTP_TTL_MINUTES),
         ]);
-
-        // No explicit ->afterCommit() here: this method opens no wrapping
-        // transaction of its own, so there's nothing to defer past — and
-        // relying on afterCommit would also mean the dispatch silently
-        // never fires under test harnesses that wrap the whole test in an
-        // outer transaction that's rolled back rather than committed.
         SendPasswordResetOtp::dispatch($email, $otp);
     }
 

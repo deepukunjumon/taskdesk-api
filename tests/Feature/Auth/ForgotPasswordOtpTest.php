@@ -39,22 +39,22 @@ function forgotPasswordTestRequestOtp(string $email): string
 }
 
 // ---------------------------------------------------------------------------
-// Non-disclosure — identical response regardless of whether the email exists
+// Account existence — deliberately disclosed (user-enumeration tradeoff
+// accepted as a product decision; see PasswordResetService::requestOtp()).
 // ---------------------------------------------------------------------------
 
-it('returns an identical response for an existing vs a non-existing email', function () {
+it('succeeds for an existing email', function () {
     User::factory()->create(['email' => 'exists@taskdesk.test']);
 
-    $existing = $this->postJson('/api/forgot-password', ['email' => 'exists@taskdesk.test']);
-    $nonExisting = $this->postJson('/api/forgot-password', ['email' => 'nobody-here@taskdesk.test']);
+    $response = $this->postJson('/api/forgot-password', ['email' => 'exists@taskdesk.test']);
 
-    $existing->assertOk();
-    $nonExisting->assertOk();
-    expect($existing->json())->toBe($nonExisting->json());
+    $response->assertOk()->assertJsonPath('success', true);
 });
 
-it('does not dispatch an OTP email for a non-existing email', function () {
-    $this->postJson('/api/forgot-password', ['email' => 'nobody-here@taskdesk.test'])->assertOk();
+it('rejects a non-existing email with a validation error, and does not dispatch an OTP email', function () {
+    $response = $this->postJson('/api/forgot-password', ['email' => 'nobody-here@taskdesk.test']);
+
+    $response->assertStatus(422)->assertJsonValidationErrors('email');
 
     Queue::assertNotPushed(SendPasswordResetOtp::class);
     expect(PasswordResetOtp::count())->toBe(0);

@@ -18,6 +18,9 @@ class PasswordResetController extends Controller
 
     /**
      * Handle a password reset request by sending an OTP to the user's email.
+     *
+     * @param ForgotPasswordRequest $request
+     * @return JsonResponse
      */
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
@@ -25,7 +28,7 @@ class PasswordResetController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'If an account exists for that email, a verification code has been sent.',
+            'message' => 'A verification code has been sent to your email.',
         ]);
     }
 
