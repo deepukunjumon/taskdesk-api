@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\IndexUserRequest;
 use App\Http\Requests\RelieveUserRequest;
+use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserManagerRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Requests\UpdateUserStatusRequest;
@@ -33,6 +34,15 @@ class UserController extends Controller
         $perPage = (int) ($filters['per_page'] ?? 15);
 
         return UserResource::collection($this->users->list($filters, $perPage))->response();
+    }
+
+    public function store(StoreUserRequest $request): JsonResponse
+    {
+        $this->authorize('create', User::class);
+
+        $created = $this->users->create($request->validated());
+
+        return (new UserResource($created))->response()->setStatusCode(201);
     }
 
     public function update(UpdateUserRequest $request, User $user): JsonResponse

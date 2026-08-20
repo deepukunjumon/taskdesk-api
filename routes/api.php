@@ -38,6 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
 
     Route::get('/users', [UserController::class, 'index']);
+    Route::post('/users', [UserController::class, 'store']);
     Route::get('/users/me/assignable', [UserController::class, 'assignable']);
     Route::patch('/users/{user}/manager', [UserController::class, 'updateManager']);
     Route::patch('/users/{user}/status', [UserController::class, 'updateStatus']);

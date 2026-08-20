@@ -22,7 +22,7 @@ class IndexUserRequest extends FormRequest
             'role' => ['sometimes', Rule::in(Role::values())],
             'department_id' => ['sometimes', 'uuid'],
             'is_active' => ['sometimes', 'boolean'],
-            'q' => ['sometimes', 'string', 'max:255'],
+            'q' => ['sometimes', 'nullable', 'string', 'max:255'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'page' => ['sometimes', 'integer', 'min:1'],
         ];
