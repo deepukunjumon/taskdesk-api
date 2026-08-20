@@ -11,6 +11,5 @@ class BranchSeeder extends Seeder
     public function run(): void
     {
         Branch::firstOrCreate(['code' => 'HO'], ['name' => 'Head Office', 'type' => BranchType::Branch->value]);
-        Branch::firstOrCreate(['code' => 'TEST'], ['name' => 'Test Branch', 'type' => BranchType::Branch->value]);
     }
 }
