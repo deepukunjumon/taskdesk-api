@@ -122,6 +122,24 @@ class UserService
     }
 
     /**
+     * The actor's own direct reports (manager_id = $actor->id only, not the
+     * full descendant chain — "my team", not "everyone under me at any
+     * depth") — lets a reporting manager see their team without the
+     * admin-only /users list. Always self-scoped by construction, so no
+     * policy gate is needed: a caller can only ever request their own reports.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, User>
+     */
+    public function myReports(User $actor): \Illuminate\Database\Eloquent\Collection
+    {
+        return $actor->reports()
+            ->with(['department', 'manager'])
+            ->withCount('reports')
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
      * @throws ValidationException
      */
     public function updateManager(User $target, ?string $managerId): User

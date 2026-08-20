@@ -101,4 +101,14 @@ class UserController extends Controller
 
         return (new UserResource($updated))->response();
     }
+
+    /**
+     * The authenticated user's own direct reports — lets a reporting
+     * manager see their team without needing admin/superadmin access to
+     * the full Users list. Self-scoped by construction; no policy gate.
+     */
+    public function myReports(Request $request): JsonResponse
+    {
+        return UserResource::collection($this->users->myReports($request->user()))->response();
+    }
 }
