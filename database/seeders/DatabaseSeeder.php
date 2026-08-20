@@ -26,13 +26,5 @@ class DatabaseSeeder extends Seeder
             'password' => 'password',
         ]);
         $superAdmin->assignRole(Role::SuperAdmin->value);
-
-        $admin = User::factory()->create([
-            'name' => 'Admin User',
-            'email' => 'admin@taskdesk.test',
-            'password' => 'password',
-        ]);
-        $admin->assignRole(Role::Admin->value);
-
     }
 }

@@ -17,6 +17,11 @@ class UserPolicy
         return $user->hasRole([Role::SuperAdmin->value, Role::Admin->value]) || $user->id === $target->id;
     }
 
+    public function create(User $user): bool
+    {
+        return $user->hasRole([Role::SuperAdmin->value, Role::Admin->value]);
+    }
+
     public function updateManager(User $user): bool
     {
         return $user->hasRole([Role::SuperAdmin->value, Role::Admin->value]);
