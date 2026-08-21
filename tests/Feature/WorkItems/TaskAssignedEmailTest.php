@@ -1,13 +1,15 @@
 <?php
 
-use App\Contracts\MailerInterface;
 use App\Enums\Role;
+use App\Jobs\SendWorkItemEmail;
 use App\Models\Department;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
+    Queue::fake();
 });
 
 /**
@@ -25,18 +27,11 @@ function taskAssignedEmailTestManager(): array
 }
 
 // ---------------------------------------------------------------------------
-// Sent on create
+// Queued on create
 // ---------------------------------------------------------------------------
 
-it('sends the task-assigned email when creating a task assigned to someone else', function () {
+it('queues the task-assigned email when creating a task assigned to someone else', function () {
     [$manager, $report, $department] = taskAssignedEmailTestManager();
-
-    $mock = Mockery::mock(MailerInterface::class);
-    $mock->shouldReceive('send')
-        ->once()
-        ->withArgs(fn (string $to, string $subject, string $htmlBody) => $to === $report->email)
-        ->andReturn(true);
-    $this->app->instance(MailerInterface::class, $mock);
 
     $response = $this->actingAs($manager)->postJson('/api/work-items', [
         'department_id' => $department->id,
@@ -49,16 +44,20 @@ it('sends the task-assigned email when creating a task assigned to someone else'
     ]);
 
     $response->assertStatus(201);
+    $workItemId = $response->json('data.id');
+
+    Queue::assertPushed(
+        SendWorkItemEmail::class,
+        fn (SendWorkItemEmail $job) => $job->workItemId === $workItemId
+            && $job->actorId === $manager->id
+            && $job->view === 'emails.task-assigned',
+    );
 });
 
-it('does not send the task-assigned email on self-assignment at creation', function () {
+it('does not queue the task-assigned email on self-assignment at creation', function () {
     $department = Department::factory()->create();
     $user = User::factory()->create(['department_id' => $department->id]);
     $user->assignRole(Role::User->value);
-
-    $mock = Mockery::mock(MailerInterface::class);
-    $mock->shouldNotReceive('send');
-    $this->app->instance(MailerInterface::class, $mock);
 
     $response = $this->actingAs($user)->postJson('/api/work-items', [
         'department_id' => $department->id,
@@ -71,20 +70,17 @@ it('does not send the task-assigned email on self-assignment at creation', funct
     ]);
 
     $response->assertStatus(201);
+    Queue::assertNotPushed(SendWorkItemEmail::class);
 });
 
 // ---------------------------------------------------------------------------
-// Sent on reassign
+// Queued on reassign
 // ---------------------------------------------------------------------------
 
-it('sends the task-assigned email when reassigning a task to someone else', function () {
+it('queues the task-assigned email when reassigning a task to someone else', function () {
     [$manager, $report, $department] = taskAssignedEmailTestManager();
     $otherReport = User::factory()->create(['department_id' => $department->id, 'manager_id' => $manager->id]);
     $otherReport->assignRole(Role::User->value);
-
-    $noopMailer = Mockery::mock(MailerInterface::class);
-    $noopMailer->shouldReceive('send')->andReturn(true);
-    $this->app->instance(MailerInterface::class, $noopMailer);
 
     $created = $this->actingAs($manager)->postJson('/api/work-items', [
         'department_id' => $department->id,
@@ -96,26 +92,24 @@ it('sends the task-assigned email when reassigning a task to someone else', func
         'description' => 'Details',
     ])->json('data');
 
-    $mock = Mockery::mock(MailerInterface::class);
-    $mock->shouldReceive('send')
-        ->once()
-        ->withArgs(fn (string $to, string $subject, string $htmlBody) => $to === $otherReport->email)
-        ->andReturn(true);
-    $this->app->instance(MailerInterface::class, $mock);
+    // Reset so only the reassign-time dispatch is asserted below.
+    Queue::fake();
 
     $response = $this->actingAs($manager)->patchJson("/api/work-items/{$created['id']}/reassign", [
         'assigned_to_id' => $otherReport->id,
     ]);
 
     $response->assertOk();
+    Queue::assertPushed(
+        SendWorkItemEmail::class,
+        fn (SendWorkItemEmail $job) => $job->workItemId === $created['id']
+            && $job->actorId === $manager->id
+            && $job->view === 'emails.task-assigned',
+    );
 });
 
-it('does not send the task-assigned email when reassigning a task to the actor themself', function () {
+it('does not queue the task-assigned email when reassigning a task to the actor themself', function () {
     [$manager, $report, $department] = taskAssignedEmailTestManager();
-
-    $noopMailer = Mockery::mock(MailerInterface::class);
-    $noopMailer->shouldReceive('send')->andReturn(true);
-    $this->app->instance(MailerInterface::class, $noopMailer);
 
     $created = $this->actingAs($manager)->postJson('/api/work-items', [
         'department_id' => $department->id,
@@ -127,67 +121,93 @@ it('does not send the task-assigned email when reassigning a task to the actor t
         'description' => 'Details',
     ])->json('data');
 
-    $mock = Mockery::mock(MailerInterface::class);
-    $mock->shouldNotReceive('send');
-    $this->app->instance(MailerInterface::class, $mock);
+    Queue::fake();
 
     $response = $this->actingAs($manager)->patchJson("/api/work-items/{$created['id']}/reassign", [
         'assigned_to_id' => $manager->id,
     ]);
 
     $response->assertOk();
+    Queue::assertNotPushed(SendWorkItemEmail::class);
 });
 
 // ---------------------------------------------------------------------------
-// Content and failure handling
+// Job internals — mocked mailer, never hits the real Pepipost API
 // ---------------------------------------------------------------------------
 
-it('sends with the correct subject and body content', function () {
-    [$manager, $report, $department] = taskAssignedEmailTestManager();
+it('calls MailerInterface::send with the correct recipient and content', function () {
+    $department = Department::factory()->create();
+    $assignedBy = User::factory()->create();
+    $assignedBy->assignRole(Role::User->value);
+    $assignee = User::factory()->create([
+        'email' => 'assignee@taskdesk.test',
+        'department_id' => $department->id,
+    ]);
+    $assignee->assignRole(Role::User->value);
 
-    $mock = Mockery::mock(MailerInterface::class);
+    $workItem = App\Models\WorkItem::factory()->create([
+        'department_id' => $department->id,
+        'assigned_to_id' => $assignee->id,
+        'assigned_by_id' => $assignedBy->id,
+        'task_id' => 'T0099',
+        'subject' => 'Investigate the outage',
+    ]);
+
+    $mock = Mockery::mock(App\Contracts\MailerInterface::class);
     $mock->shouldReceive('send')
         ->once()
-        ->withArgs(function (string $to, string $subject, string $htmlBody) use ($report) {
-            return $to === $report->email
-                && str_contains($subject, 'Investigate the outage')
-                && str_contains($htmlBody, 'Investigate the outage')
-                && str_contains($htmlBody, $manager->name);
+        ->withArgs(function (string $to, string $subject, string $htmlBody) use ($workItem) {
+            return $to === 'assignee@taskdesk.test'
+                && str_contains($subject, $workItem->task_id)
+                && str_contains($htmlBody, $workItem->task_id)
+                && str_contains($htmlBody, $workItem->subject);
         })
         ->andReturn(true);
-    $this->app->instance(MailerInterface::class, $mock);
 
-    $response = $this->actingAs($manager)->postJson('/api/work-items', [
-        'department_id' => $department->id,
-        'entry_type' => 'task',
-        'assigned_to_id' => $report->id,
-        'source' => 'internal',
-        'priority' => 'low',
-        'subject' => 'Investigate the outage',
-        'description' => 'Details',
-    ]);
-
-    $response->assertStatus(201);
+    (new SendWorkItemEmail(
+        $workItem->id,
+        $assignedBy->id,
+        'emails.task-assigned',
+        "Task Assigned: {$workItem->task_id} — {$workItem->subject}",
+    ))->handle($mock);
 });
 
-it('does not fail the request when the mailer reports a failure', function () {
-    [$manager, $report, $department] = taskAssignedEmailTestManager();
+it('throws when the mailer reports failure, so the queue retries rather than silently dropping it', function () {
+    $department = Department::factory()->create();
+    $assignedBy = User::factory()->create();
+    $assignedBy->assignRole(Role::User->value);
+    $assignee = User::factory()->create(['department_id' => $department->id]);
+    $assignee->assignRole(Role::User->value);
 
-    $mock = Mockery::mock(MailerInterface::class);
+    $workItem = App\Models\WorkItem::factory()->create([
+        'department_id' => $department->id,
+        'assigned_to_id' => $assignee->id,
+        'assigned_by_id' => $assignedBy->id,
+    ]);
+
+    $mock = Mockery::mock(App\Contracts\MailerInterface::class);
     $mock->shouldReceive('send')->once()->andReturn(false);
-    $this->app->instance(MailerInterface::class, $mock);
 
-    $response = $this->actingAs($manager)->postJson('/api/work-items', [
-        'department_id' => $department->id,
-        'entry_type' => 'task',
-        'assigned_to_id' => $report->id,
-        'source' => 'internal',
-        'priority' => 'low',
-        'subject' => 'Should still succeed',
-        'description' => 'Details',
-    ]);
+    $job = new SendWorkItemEmail(
+        $workItem->id,
+        $assignedBy->id,
+        'emails.task-assigned',
+        "Task Assigned: {$workItem->task_id} — {$workItem->subject}",
+    );
 
-    // The assignment already succeeded before the mailer was ever called —
-    // a delivery failure must never surface as a failed API response.
-    $response->assertStatus(201);
+    expect(fn () => $job->handle($mock))->toThrow(RuntimeException::class);
 });
+
+it('does nothing when the work item no longer exists by the time the job runs', function () {
+    $mock = Mockery::mock(App\Contracts\MailerInterface::class);
+    $mock->shouldNotReceive('send');
+
+    $job = new SendWorkItemEmail(
+        '00000000-0000-0000-0000-000000000000',
+        'also-missing',
+        'emails.task-assigned',
+        'Task Assigned: T0000 — Missing',
+    );
+
+    $job->handle($mock);
+})->throwsNoExceptions();

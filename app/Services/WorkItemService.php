@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Contracts\MailerInterface;
 use App\Enums\WorkItemStatus;
+use App\Jobs\SendWorkItemEmail;
 use App\Models\SlaSetting;
 use App\Models\User;
 use App\Models\WorkItem;
@@ -18,7 +18,6 @@ class WorkItemService
     public function __construct(
         private readonly WorkItemRepositoryInterface $items,
         private readonly WorkItemStatusTransitioner $transitioner,
-        private readonly MailerInterface $mailer,
     ) {}
 
     /**
@@ -167,12 +166,8 @@ class WorkItemService
     }
 
     /**
-     * Sends an email to the assignee if the actor is not the assignee.
-     * 
-     * @param WorkItem $item
-     * @param User $actor
-     * 
-     * @return bool
+     * Queues an assignment email to the assignee if the actor is not the
+     * assignee themself.
      */
     private function notifyAssignmentIfNeeded(WorkItem $item, User $actor): bool
     {
@@ -180,13 +175,10 @@ class WorkItemService
             return false;
         }
 
-        $this->sendWorkItemEmail(
-            $item,
+        SendWorkItemEmail::dispatch(
+            $item->id,
+            $actor->id,
             'emails.task-assigned',
-            [
-                'assignedTo' => $item->assignedTo->name,
-                'assignedBy' => $actor
-            ],
             "Task Assigned: {$item->task_id} — {$item->subject}",
         );
 
@@ -194,12 +186,8 @@ class WorkItemService
     }
 
     /**
-     * Sends an email to the assignee if the actor is not the assignee and the item is completed.
-     * 
-     * @param WorkItem $item
-     * @param User $actor
-     * 
-     * @return bool
+     * Queues a completion email to the assignee if the actor (the one who
+     * closed it) is not the assignee themself.
      */
     private function notifyCompletionIfNeeded(WorkItem $item, User $actor): bool
     {
@@ -207,28 +195,14 @@ class WorkItemService
             return false;
         }
 
-        $this->sendWorkItemEmail(
-            $item,
+        SendWorkItemEmail::dispatch(
+            $item->id,
+            $actor->id,
             'emails.task-completed',
-            ['completedBy' => $actor],
             "Task Completed: {$item->task_id} — {$item->subject}",
         );
 
         return true;
-    }
-
-    /**
-     * Sends an email to the assignee with the given view and data.
-     * 
-     * @param  array<string, mixed>  $data
-     */
-    private function sendWorkItemEmail(WorkItem $item, string $view, array $data, string $subject): void
-    {
-        $taskUrl = rtrim(config('services.frontend.url'), '/').'/work-register';
-
-        $htmlBody = view($view, [...$data, 'workItem' => $item, 'taskUrl' => $taskUrl])->render();
-
-        $this->mailer->send($item->assignedTo->email, $subject, $htmlBody);
     }
 
     private function recordTimeline(
